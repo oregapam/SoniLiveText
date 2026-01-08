@@ -16,9 +16,42 @@ const ICON_BYTES: &[u8] = include_bytes!("../assets/icon.png");
 async fn run() -> Result<(), SonioxWindowsErrors> {
     let settings = SettingsApp::new("soniox.toml")?;
     let (width, height) = get_screen_size();
-    let position = settings.get_position(height);
+    
+    let window_width = match settings.window_width() {
+        Some(w) => w,
+        None => {
+            let msg = "Missing 'window_width' in soniox.toml! This parameter is required.";
+            show_error(msg);
+            log::error!("{}", msg);
+            std::process::exit(1);
+        }
+    };
+    let window_height = settings.window_height();
+    
+    // With mandatory width, get_inner_size is simpler.
+    let (final_w, final_h) = get_inner_size(
+        // screen width needed? Actually now we have specific width.
+        // But get_inner_size might handle height default.
+        width as f32, // potentially unused if we passed width directly to it, but let's check utils modification plan
+        Some(window_width),
+        window_height,
+    );
+    
+    // However, if window_width is NOT set, get_inner_size relied on position to calculate margin.
+    // If we want to use anchor, we probably don't want the old "margin from position" logic for width.
+    // Let's assume a default width if not set, or keep it safe.
+    // The old logic was: width - pos_x - OFFSET*2. pos_x was OFFSET_WIDTH.
+    // So default width was roughly screen_width - OFFSET*4.
+    
+    // For now, let's call get_position.
+    let position = settings.get_position(width as f32, height as f32, final_w, final_h);
+    
+    // Re-calculate size if needed? No, size is fixed/resolved.
+    // But get_inner_size might need the FINAL position if we keep the "dynamic width" logic based on margins.
+    // Let's look at get_inner_size again.
+    
     let app = initialize_app(settings)?;
-    let size = get_inner_size(position, width as f32);
+    
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder::default()
             .with_app_id("sublive")
@@ -26,9 +59,9 @@ async fn run() -> Result<(), SonioxWindowsErrors> {
             .with_decorations(false)
             .with_always_on_top()
             .with_transparent(true)
-            .with_min_inner_size(size)
-            .with_inner_size(size)
-            .with_max_inner_size(size)
+            .with_min_inner_size((final_w, final_h))
+            .with_inner_size((final_w, final_h))
+            .with_max_inner_size((final_w, final_h))
             .with_position(position),
         ..Default::default()
     };

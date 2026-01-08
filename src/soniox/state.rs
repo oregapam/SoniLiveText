@@ -23,6 +23,22 @@ impl TranscriptionState {
         std::iter::once(&self.interim_line).chain(&self.finishes_lines)
     }
 
+    pub fn update_animation(&mut self) -> bool {
+        let mut request_repaint = false;
+        if self.interim_line.update_animation() {
+            request_repaint = true;
+        }
+        for line in &mut self.finishes_lines {
+            // Only animate newest line if needed, or all lines?
+            // Usually only the newest inserted line needs animation, but
+            // let's just update all to be safe.
+            if line.update_animation() {
+                request_repaint = true;
+            }
+        }
+        request_repaint
+    }
+
     pub fn handle_transcription(&mut self, response: SonioxTranscriptionResponse) {
         let mut interim_text = String::new();
         let mut interim_speaker = Option::<String>::None;
@@ -61,7 +77,10 @@ impl TranscriptionState {
             return;
         }
         match self.finishes_lines.front_mut() {
-            Some(last) if last.speaker == speaker => last.text.push_str(&text),
+            Some(last) if last.speaker == speaker => {
+                last.text.push_str(&text);
+                // Don't auto-update displayed_text here to allow animation
+            },
             _ => self
                 .finishes_lines
                 .push_front(AudioSubtitle::new(speaker, text)),
@@ -73,11 +92,25 @@ impl TranscriptionState {
     }
 
     fn update_interim(&mut self, speaker: Option<String>, text: String) {
+        // If the new interim text is DIFFERENT from the old one, we should reset animation?
+        // Or just update target.
+        // For interim, usually it updates rapidly. Animation might just lag behind.
+        
         match self.finishes_lines.front_mut() {
             Some(last) if last.speaker == speaker => {
-                self.interim_line = AudioSubtitle::new(None, text)
+                 self.interim_line = AudioSubtitle::new_complete(None, text);
             }
-            _ => self.interim_line = AudioSubtitle::new(speaker, text),
+            _ => {
+                // For interim, usually we want to see it immediately if it updates fast.
+                // But for translation, it might jump.
+                // Let's use animation for interim too.
+                
+                // If text is completely different, maybe we should reset displayed_text?
+                // But typically Soniox appends.
+                
+                 self.interim_line.speaker = speaker;
+                 self.interim_line.text = text;
+            },
         }
     }
 }

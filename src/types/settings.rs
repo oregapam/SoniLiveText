@@ -1,6 +1,5 @@
 use crate::errors::SonioxWindowsErrors;
 use crate::types::languages::LanguageHint;
-use crate::types::offset::{OFFSET_WIDTH, WINDOW_HEIGHT};
 use config::{Config, ConfigError, File};
 use log::LevelFilter;
 use serde::Deserialize;
@@ -16,9 +15,14 @@ pub struct SettingsApp {
     enable_high_priority: bool,
     enable_speakers: bool,
     level: String,
-    position: (f32, f32),
-    font_size: f32,
-    text_color: (u8, u8, u8),
+    pub(crate) font_size: f32,
+    pub(crate) text_color: (u8, u8, u8),
+    pub(crate) window_width: Option<f32>,
+    pub(crate) window_height: Option<f32>,
+    pub(crate) window_anchor: Option<String>,
+    pub(crate) window_offset: Option<(f32, f32)>,
+    #[serde(default)]
+    pub(crate) audio_input: String,
 }
 
 impl SettingsApp {
@@ -73,14 +77,40 @@ impl SettingsApp {
         eframe::egui::Color32::from_rgb(self.text_color.0, self.text_color.1, self.text_color.2)
     }
 
-    pub fn get_position(&self, height: usize) -> (f32, f32) {
-        if self.position == (0., 0.) {
-            let window_height = WINDOW_HEIGHT;
-            let pos_x = OFFSET_WIDTH;
-            let pos_y = height as f32 - window_height - 100.;
+    pub fn get_position(&self, screen_width: f32, screen_height: f32, window_width: f32, window_height: f32) -> (f32, f32) {
+        let anchor = self.window_anchor.as_deref().unwrap_or("bottom_center");
+        let offset = self.window_offset.unwrap_or((0.0, -100.0));
+        let (offset_x, offset_y) = offset;
 
-            return (pos_x, pos_y);
-        }
-        self.position
+        // Refined Logic (Anchor Matching):
+        // X calculation
+        let x = if anchor.ends_with("_left") || anchor == "left" {
+            0.0
+        } else if anchor.ends_with("_right") || anchor == "right" {
+             screen_width - window_width
+        } else {
+            // center / top / bottom -> horizontal center
+            (screen_width - window_width) / 2.0
+        };
+        
+        // Y calculation
+        let y = if anchor.starts_with("top_") || anchor == "top" {
+            0.0
+        } else if anchor.starts_with("center_") || anchor == "center" {
+             (screen_height - window_height) / 2.0
+        } else {
+             // bottom is default
+             screen_height - window_height
+        };
+
+        (x + offset_x, y + offset_y)
+    }
+
+    pub fn window_width(&self) -> Option<f32> {
+        self.window_width
+    }
+
+    pub fn window_height(&self) -> Option<f32> {
+        self.window_height
     }
 }

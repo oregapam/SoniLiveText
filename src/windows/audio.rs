@@ -9,12 +9,20 @@ use wasapi::{DeviceEnumerator, Direction, StreamMode, initialize_mta};
 pub fn start_capture_audio(
     tx_audio: UnboundedSender<AudioMessage>,
     mut rx_stop: UnboundedReceiver<bool>,
+    input_mode: &str,
 ) -> Result<(), SonioxWindowsErrors> {
     initialize_mta()
         .ok()
         .map_err(|_| SonioxWindowsErrors::Internal(""))?;
     let enumerator = DeviceEnumerator::new()?;
-    let device = enumerator.get_default_device(&Direction::Render)?;
+    
+    let direction = if input_mode == "microphone" {
+        Direction::Capture
+    } else {
+        Direction::Render
+    };
+    
+    let device = enumerator.get_default_device(&direction)?;
     let mut audio_client = device.get_iaudioclient()?;
     let format = audio_client.get_mixformat()?;
     let bytes_per_frame = format.get_blockalign() as usize;

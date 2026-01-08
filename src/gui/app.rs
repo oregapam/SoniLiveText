@@ -40,7 +40,7 @@ impl SubtitlesApp {
             font_size,
             text_color,
             initialized_windows: false,
-            subtitles_state: TranscriptionState::new(3),
+            subtitles_state: TranscriptionState::new(50),
         }
     }
 }
@@ -61,6 +61,11 @@ impl App for SubtitlesApp {
                 if let Ok(transcription) = self.rx_transcription.try_recv() {
                     self.subtitles_state.handle_transcription(transcription);
                 }
+                
+                if self.subtitles_state.update_animation() {
+                    ctx.request_repaint();
+                }
+
                 ui.vertical(|ui| {
                     draw_text_with_shadow(
                         ui,
@@ -69,6 +74,11 @@ impl App for SubtitlesApp {
                         self.text_color,
                     );
                 });
+                
+                // Still request repaint for next frames if potentially animating,
+                // or just rely on the update_animation return value + generic request_repaint.
+                // But for smoother animation, we might want to keep repainting if we know things are changing.
+                // FRAME_TIME ensures we don't spin too fast.
                 ctx.request_repaint_after(FRAME_TIME);
             });
     }

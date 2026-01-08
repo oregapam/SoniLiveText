@@ -39,8 +39,9 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
         settings.font_size(),
         settings.text_color(),
     );
+    let audio_input = settings.audio_input.clone();
     tokio::task::spawn_blocking(move || {
-        if let Err(err) = start_capture_audio(tx_audio, rx_exit) {
+        if let Err(err) = start_capture_audio(tx_audio, rx_exit, &audio_input) {
             log::error!("{}", err);
         }
     });

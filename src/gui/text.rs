@@ -1,6 +1,7 @@
 use eframe::egui::Ui;
 use eframe::epaint::{Color32, FontId};
 
+#[allow(dead_code)]
 pub(crate) fn trim_text_to_fit_precise(
     text: impl Into<String>,
     ui: &Ui,

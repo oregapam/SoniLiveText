@@ -9,7 +9,14 @@ pub(crate) fn create_request(
 ) -> Result<SonioxTranscriptionRequest<'_>, SonioxWindowsErrors> {
     initialize_mta().ok()?;
     let enumerator = DeviceEnumerator::new()?;
-    let device = enumerator.get_default_device(&Direction::Render)?;
+    
+    let direction = if settings.audio_input == "microphone" {
+        Direction::Capture
+    } else {
+        Direction::Render
+    };
+    
+    let device = enumerator.get_default_device(&direction)?;
     let audio_client = device.get_iaudioclient()?;
     let format = audio_client.get_mixformat()?;
     let sample_rate = format.get_samplespersec();
@@ -23,6 +30,7 @@ pub(crate) fn create_request(
         context: Some(settings.context()),
         language_hints: settings.language_hints(),
         enable_speaker_diarization: Some(settings.enable_speakers()),
+        enable_non_final_tokens: Some(true),
         ..Default::default()
     };
     if settings.enable_translate {

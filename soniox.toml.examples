@@ -6,6 +6,9 @@ target_language = "ru"                      # translation language
 enable_translate = false                    # enable translate
 enable_high_priority = true                 # always on top or not
 enable_speakers = false                     # enable speakers id
-position = [0, 0]                           # [0, 0] = default dynamic size
-font_size = 24                              # font size
 text_color = [255, 255, 0]                  # text color in RGB, default is YELLOW
+window_width = 800.0                        # window width (optional)
+window_height = 700.0                       # window height (optional)
+window_anchor = "bottom_center"             # anchor: top_left, top_center, top_right, center_left, center, center_right, bottom_left, bottom_center, bottom_right
+window_offset = [0.0, -100.0]               # offset [x, y] from anchor
+audio_input = "loopback"                    # audio input: "loopback" (default) or "microphone"
