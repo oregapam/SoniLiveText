@@ -38,7 +38,7 @@ Currently, SoniLiveText is distributed as source code. You will need to build it
     ```powershell
     cargo build --release
     ```
-    The executable will be located at `target/release/soniox_windows.exe`.
+    The executable will be located at `target/release/sonilivetext.exe`.
 
 3.  **Setup Configuration:**
     *   Copy the `config.toml.example` file to the same directory as your executable.

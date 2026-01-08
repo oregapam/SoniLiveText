@@ -1,8 +1,8 @@
 [package]
-name = "soniox_windows"
-version = "0.5.0"
-edition = "2024"
-repository = "https://github.com/eoftgge/soniox_windows"
+name = "sonilivetext"
+version = "0.1.0"
+edition = "2026"
+repository = "https://github.com/oregapam/SoniLiveText"
 rust-version = "1.89.0"
 
 [dependencies]
