@@ -38,6 +38,7 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
         settings.enable_high_priority(),
         settings.font_size(),
         settings.text_color(),
+        settings.show_window_border(),
     );
     let audio_input = settings.audio_input().to_string();
     tokio::task::spawn_blocking(move || {

@@ -22,6 +22,7 @@ pub struct SettingsApp {
     pub(crate) window_anchor: Option<String>,
     pub(crate) window_offset: Option<(f32, f32)>,
     pub(crate) audio_input: Option<String>,
+    pub(crate) show_window_border: Option<bool>,
 }
 
 impl SettingsApp {
@@ -51,6 +52,7 @@ impl SettingsApp {
         if self.window_anchor.is_none() { missing_fields.push("window_anchor"); }
         if self.window_offset.is_none() { missing_fields.push("window_offset"); }
         if self.audio_input.is_none() { missing_fields.push("audio_input"); }
+        if self.show_window_border.is_none() { missing_fields.push("show_window_border"); }
 
 
         if !missing_fields.is_empty() {
@@ -143,5 +145,9 @@ impl SettingsApp {
 
     pub fn audio_input(&self) -> &str {
         self.audio_input.as_ref().expect("Validated")
+    }
+
+    pub fn show_window_border(&self) -> bool {
+        self.show_window_border.expect("Validated")
     }
 }

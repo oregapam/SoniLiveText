@@ -21,6 +21,7 @@ pub struct SubtitlesApp {
     font_size: f32,
     text_color: Color32,
     subtitles_state: TranscriptionState,
+    show_window_border: bool,
 }
 
 impl SubtitlesApp {
@@ -31,6 +32,7 @@ impl SubtitlesApp {
         enable_high_priority: bool,
         font_size: f32,
         text_color: Color32,
+        show_window_border: bool,
     ) -> Self {
         Self {
             rx_transcription,
@@ -41,14 +43,20 @@ impl SubtitlesApp {
             text_color,
             initialized_windows: false,
             subtitles_state: TranscriptionState::new(50),
+            show_window_border,
         }
     }
 }
 
 impl App for SubtitlesApp {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+        let mut app_frame = eframe::egui::Frame::default().fill(Color32::TRANSPARENT);
+        if self.show_window_border {
+            app_frame = app_frame.stroke(eframe::egui::Stroke::new(2.0, self.text_color));
+        }
+
         CentralPanel::default()
-            .frame(eframe::egui::Frame::default().fill(Color32::TRANSPARENT))
+            .frame(app_frame)
             .show(ctx, |ui| {
                 make_window_click_through(frame);
                 if !self.initialized_windows {
