@@ -1,40 +1,79 @@
-# Soniox: Subtitles Live
-**An advanced AI-based Soniox application that draws subtitles on the screen.
-It supports only the Windows operating system, there can be no question of supporting other systems.**
+# SoniLiveText
 
-**Advantages**
-* It does not work as a window, but as a purely disguised and privileged window with text, and you can even click through it with the mouse. Quite convenient.
-* Uninterrupted operation. If the connection is disconnected, it makes a repeat request to the server.
-* Minimal memory consumption.
-* And the most important thing is that it receives sound directly from Windows, without any third-party virtual channels. I'll say it's very convenient.
+**Advanced Real-time AI Subtitles & Translation for Windows**
 
-**Disadvantages**
-* A quite inconvenient setup for inexperienced users. However, you can figure it out quickly, I think.
+SoniLiveText is a powerful, lightweight Windows application that generates real-time subtitles for any audio playing on your system. Powered by the Soniox AI engine, it provides high-accuracy speech-to-text and instant translation, displayed in a non-intrusive, customizable overlay window.
 
-### TODO
-1. [x] Add translate as field to application
-2. [x] Add binary-execution files
-3. [ ] Add the separate window for settings application (In the distant future)
-4. [x] Add mark speaker ID for conversation
-5. [x] Fix exit application (in some instances)
-6. [x] Add display messages errors
-7. [ ] Add advanced error handling responses Soniox
+Unlike standard windows, SoniLiveText renders text directly onto the screen background, allowing you to click through it and work uninterrupted while keeping track of spoken content.
 
-### Launch
-For build and start, you need [Rust Compiler](https://rust-lang.org/tools/install/)
-```terminaloutput
->>> git clone https://github.com/eoftgge/soniox_windows.git
->>> cd soniox_windows
->>> cargo build --release
-// in directory target/release appear file .exe, and move it file to the your directory
-// and you should to create new configuration file (soniox.toml), example in repository.
-// and run normally execution file. maybe, the antivirus will complain. it's normal
-```
+---
 
-And you can also use binaries from [GitHub Releases](https://github.com/eoftgge/soniox_windows/releases) <br>
-To run, you need a corresponding configuration file, an example is in the repository. Create it and fill in the config.
-And run. Enjoy :)
+## 🚀 Key Features
 
+*   **System-Wide Audio Capture**: Uses Windows WASAPI Loopback to capture sound directly from your system with zero latency. No virtual cables or third-party drivers needed.
+*   **"Ghost" Overlay**: Subtitles are drawn on a click-through, transparent layer. It floats above other windows (or at the bottom) without stealing focus or blocking mouse interactions.
+*   **High-Accuracy AI Transcription**: Leverages the Soniox API for state-of-the-art speech recognition.
+*   **Live Translation**: Instantly translate spoken text into your target language.
+*   **Speaker Identification**: distinguishing between different speakers in a conversation.
+*   **Resilient Connectivity**: Automatically reconnects if the server connection drops.
+*   **Highly Configurable**: Customize window position, size, colors, fonts, and behavior via a simple configuration file.
+*   **Microphone Support**: Can optionally switch to microphone input for dictation or meeting transcription.
 
+## 🛠️ Installation & Build
 
-If you have any problems, don't hesitate to ask in the Issues section
+Currently, SoniLiveText is distributed as source code. You will need to build it yourself using the Rust toolchain.
+
+### Prerequisites
+*   **Rust Compiler**: Install the latest stable version from [rust-lang.org](https://www.rust-lang.org/tools/install).
+
+### Build Instructions
+
+1.  **Clone the repository:**
+    ```powershell
+    git clone https://github.com/eoftgge/soniox_windows.git SoniLiveText
+    cd SoniLiveText
+    ```
+
+2.  **Build the release binary:**
+    ```powershell
+    cargo build --release
+    ```
+    The executable will be located at `target/release/soniox_windows.exe`.
+
+3.  **Setup Configuration:**
+    *   Copy the `soniox.toml.examples` file to the same directory as your executable.
+    *   Rename it to `soniox.toml`.
+    *   Edit the file with your API key and preferences (see below).
+
+## ⚙️ Configuration (`soniox.toml`)
+
+The application is controlled entirely via the `soniox.toml` file.
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `api_key` | String | **Required.** Your Soniox API key. |
+| `language_hints` | Array | List of expected source languages (e.g., `["en", "ru", "hu"]`). |
+| `target_language` | String | Language code to translate into (e.g., `"hu"`). |
+| `enable_translate` | Boolean | Set to `true` to enable live translation. |
+| `context` | String | Context hint for the AI to improve accuracy (e.g., specific terminology). |
+| `level` | String | Logging level (e.g., `"debug"`, `"info"`). |
+| `enable_high_priority`| Boolean | If `true`, the window tries to stay on top of other applications. |
+| `enable_speakers` | Boolean | If `true`, attempts to identify and label different speakers. |
+| `text_color` | Array | RGB text color, e.g., `[255, 255, 0]` for yellow. |
+| `window_anchor` | String | Positioning anchor: `bottom_center`, `top_left`, `center`, etc. |
+| `window_offset` | Array | `[x, y]` offset from the anchor point. |
+| `window_width` | Float | Width of the subtitle area in pixels. |
+| `window_height` | Float | Height of the subtitle area in pixels. |
+| `audio_input` | String | Source: `"loopback"` (system audio) or `"microphone"`. |
+
+##  CREDITS & ACKNOWLEDGEMENTS
+
+This project is a fork and advanced evolution of **[soniox_windows](https://github.com/eoftgge/soniox_windows)**.
+
+I deeply appreciate the work of the original author, **[eoftgge](https://github.com/eoftgge)**, who created the core architecture for capturing Windows audio and interfacing with the Soniox API. This project wouldn't exist without their initial contribution.
+
+**SoniLiveText** aims to extend this foundation with enhanced UI features, better customizability, and broader language support.
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
