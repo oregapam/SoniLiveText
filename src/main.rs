@@ -14,13 +14,13 @@ const FONT_BYTES: &[u8] = include_bytes!("../assets/MPLUSRounded1c-Medium.ttf");
 const ICON_BYTES: &[u8] = include_bytes!("../assets/icon.png");
 
 async fn run() -> Result<(), SonioxWindowsErrors> {
-    let settings = SettingsApp::new("soniox.toml")?;
+    let settings = SettingsApp::new("config.toml")?;
     let (width, height) = get_screen_size();
     
     let window_width = match settings.window_width() {
         Some(w) => w,
         None => {
-            let msg = "Missing 'window_width' in soniox.toml! This parameter is required.";
+            let msg = "Missing 'window_width' in config.toml! This parameter is required.";
             show_error(msg);
             log::error!("{}", msg);
             std::process::exit(1);

@@ -41,13 +41,13 @@ Currently, SoniLiveText is distributed as source code. You will need to build it
     The executable will be located at `target/release/soniox_windows.exe`.
 
 3.  **Setup Configuration:**
-    *   Copy the `soniox.toml.examples` file to the same directory as your executable.
-    *   Rename it to `soniox.toml`.
+    *   Copy the `config.toml.example` file to the same directory as your executable.
+    *   Rename it to `config.toml`.
     *   Edit the file with your API key and preferences (see below).
 
-## ⚙️ Configuration (`soniox.toml`)
+## ⚙️ Configuration (`config.toml`)
 
-The application is controlled entirely via the `soniox.toml` file.
+The application is controlled entirely via the `config.toml` file.
 
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
