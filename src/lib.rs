@@ -17,7 +17,7 @@ pub mod soniox;
 pub mod types;
 pub mod windows;
 
-const FILE_LOG: &str = "soniox.log";
+const FILE_LOG: &str = "run.log";
 
 pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindowsErrors> {
     let level = settings.level()?;
