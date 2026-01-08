@@ -232,21 +232,19 @@ impl TranscriptionState {
              if text.is_empty() { break; }
 
              let (chunk, remainder) = if text.len() > self.max_chars_in_block {
-                 // Too long, must split even if no previous block
-                 // Try find space near limit
+                 // Too long, must split
                  let limit = self.max_chars_in_block;
                  let split_idx = text.char_indices()
                     .filter(|(i, c)| *i <= limit && c.is_whitespace())
                     .map(|(i, _)| i)
-                    .last() // Find last space BEFORE limit
+                    .last()
                     .or_else(|| {
-                        // Fallback: look slightly after limit?
                         text.char_indices()
                             .filter(|(i, c)| *i > limit && *i < limit + 10 && c.is_whitespace())
                             .map(|(i, _)| i)
                             .next()
                     })
-                    .unwrap_or(limit.min(text.len())); // Force split if no space
+                    .unwrap_or(limit.min(text.len()));
                  
                  let (c, r) = text.split_at(split_idx);
                  (c.to_string(), Some(r.to_string()))
@@ -254,10 +252,29 @@ impl TranscriptionState {
                  (text, None)
              };
              
-             // Now try to append `chunk` to existing, OR make new
+             // Check if we should start a new block
              let should_start_new = match self.finishes_lines.front() {
                 Some(last) => {
-                    last.speaker != speaker || (last.text.len() + chunk.len()) > self.max_chars_in_block
+                    // Start new if:
+                    // 1. Speaker changed
+                    // 2. Length would exceed limit
+                    // 3. Last block ended with sentence punctuation (.?!) -> FORCE NEW LINE
+                    let ends_sentence = last.text.trim_end().ends_with(|c| c == '.' || c == '?' || c == '!');
+                    
+                    if last.speaker != speaker {
+                        self.log_debug("New Block: Speaker changed".to_string());
+                        true
+                    } else if (last.text.len() + chunk.len()) > self.max_chars_in_block {
+                         let last_word = last.text.split_whitespace().last().unwrap_or("<empty>");
+                         self.log_debug(format!("New Block: Overflow. {} + {} > {}. Last: '{}'", 
+                            last.text.len(), chunk.len(), self.max_chars_in_block, last_word));
+                        true
+                    } else if ends_sentence {
+                        self.log_debug("New Block: Sentence ends previous line.".to_string());
+                        true
+                    } else {
+                        false
+                    }
                 }
                 None => true,
             };
