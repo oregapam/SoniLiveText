@@ -21,8 +21,7 @@ pub struct SettingsApp {
     pub(crate) window_height: Option<f32>,
     pub(crate) window_anchor: Option<String>,
     pub(crate) window_offset: Option<(f32, f32)>,
-    #[serde(default)]
-    pub(crate) audio_input: String,
+    pub(crate) audio_input: Option<String>,
 }
 
 impl SettingsApp {
@@ -48,6 +47,11 @@ impl SettingsApp {
         if self.font_size.is_none() { missing_fields.push("font_size"); }
         if self.text_color.is_none() { missing_fields.push("text_color"); }
         if self.window_width.is_none() { missing_fields.push("window_width"); }
+        if self.window_height.is_none() { missing_fields.push("window_height"); }
+        if self.window_anchor.is_none() { missing_fields.push("window_anchor"); }
+        if self.window_offset.is_none() { missing_fields.push("window_offset"); }
+        if self.audio_input.is_none() { missing_fields.push("audio_input"); }
+
 
         if !missing_fields.is_empty() {
              return Err(format!("Missing mandatory fields in config.toml: {}", missing_fields.join(", ")));
@@ -101,8 +105,8 @@ impl SettingsApp {
     }
 
     pub fn get_position(&self, screen_width: f32, screen_height: f32, window_width: f32, window_height: f32) -> (f32, f32) {
-        let anchor = self.window_anchor.as_deref().unwrap_or("bottom_center");
-        let offset = self.window_offset.unwrap_or((0.0, -100.0));
+        let anchor = self.window_anchor.as_deref().expect("Validated");
+        let offset = self.window_offset.expect("Validated");
         let (offset_x, offset_y) = offset;
 
         // Refined Logic (Anchor Matching):
@@ -129,11 +133,15 @@ impl SettingsApp {
         (x + offset_x, y + offset_y)
     }
 
-    pub fn window_width(&self) -> Option<f32> {
-        self.window_width
+    pub fn window_width(&self) -> f32 {
+        self.window_width.expect("Validated")
     }
 
-    pub fn window_height(&self) -> Option<f32> {
-        self.window_height
+    pub fn window_height(&self) -> f32 {
+        self.window_height.expect("Validated")
+    }
+
+    pub fn audio_input(&self) -> &str {
+        self.audio_input.as_ref().expect("Validated")
     }
 }

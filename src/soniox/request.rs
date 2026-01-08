@@ -10,7 +10,7 @@ pub(crate) fn create_request(
     initialize_mta().ok()?;
     let enumerator = DeviceEnumerator::new()?;
     
-    let direction = if settings.audio_input == "microphone" {
+    let direction = if settings.audio_input() == "microphone" {
         Direction::Capture
     } else {
         Direction::Render

@@ -23,7 +23,7 @@ async fn run() -> Result<(), SonioxWindowsErrors> {
         std::process::exit(1);
     }
 
-    let window_width = settings.window_width().unwrap();
+    let window_width = settings.window_width();
     let window_height = settings.window_height();
     
     // With mandatory width, get_inner_size is simpler.
@@ -32,7 +32,7 @@ async fn run() -> Result<(), SonioxWindowsErrors> {
         // But get_inner_size might handle height default.
         width as f32, // potentially unused if we passed width directly to it, but let's check utils modification plan
         Some(window_width),
-        window_height,
+        Some(window_height),
     );
     
     // However, if window_width is NOT set, get_inner_size relied on position to calculate margin.

@@ -1,5 +1,5 @@
 # ==========================================
-# MANDATORY SETTINGS
+# SONIOX AI & TRANSLATION SETTINGS
 # ==========================================
 
 # Soniox API Key (Required)
@@ -12,34 +12,23 @@ language_hints = ["en", "hu"]
 # Context hint for the AI to improve accuracy (e.g. specific terminology or topic)
 context = "context for Soniox"
 
-# Logging level: "debug", "info", "warn", "error"
-level = "info"
-
-# Target language for translation (e.g. "hu", "en").
-target_language = "hu"
-
 # Enable or disable live translation (true/false)
 enable_translate = false
 
-# If true, the window tries to stay on top of other applications
-enable_high_priority = true
+# Target language for translation (e.g. "hu", "en")
+# Required even if enable_translate is false (can be set to same as source).
+target_language = "hu"
 
 # If true, attempts to distinguish and label different speakers in the transcript
 enable_speakers = false
 
-# Text color in RGB format (e.g. Yellow: [255, 255, 0])
-text_color = [255, 255, 0]
 
-# Font size for the subtitles (in pixels/points)
-font_size = 24.0
+# ==========================================
+# WINDOW & APPEARANCE SETTINGS
+# ==========================================
 
 # Window width in pixels.
-# This parameter is required for the application to calculate layout correctly.
 window_width = 800.0
-
-# ==========================================
-# OPTIONAL SETTINGS
-# ==========================================
 
 # Window height in pixels.
 # Defines the height of the subtitles area.
@@ -50,15 +39,30 @@ window_height = 700.0
 # Options: "top_left", "top_center", "top_right",
 #          "center_left", "center", "center_right",
 #          "bottom_left", "bottom_center", "bottom_right"
-# Default if omitted: "bottom_center"
 window_anchor = "bottom_center"
 
 # Offset [x, y] from the anchor point in pixels.
 # Use this to fine-tune the position (e.g. move it up from the bottom edge).
-# Default if omitted: [0.0, -100.0]
+# Example: [0.0, -100.0] moves it 100 pixels up from the bottom center.
 window_offset = [0.0, -100.0]
+
+# Text color in RGB format (e.g. Yellow: [255, 255, 0])
+text_color = [255, 255, 0]
+
+# Font size for the subtitles (in pixels/points)
+font_size = 24.0
+
+# If true, the window tries to stay on top of other applications
+enable_high_priority = true
+
+
+# ==========================================
+# SYSTEM & AUDIO SETTINGS
+# ==========================================
 
 # Audio input source.
 # Options: "loopback" (system audio) or "microphone"
-# Default if omitted: "loopback"
 audio_input = "loopback"
+
+# Logging level: "debug", "info", "warn", "error"
+level = "info"
