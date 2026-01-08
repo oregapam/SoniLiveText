@@ -3,11 +3,11 @@
 use eframe::egui::ViewportBuilder;
 use eframe::egui::{FontData, FontDefinitions, FontFamily};
 use eframe::icon_data::from_png_bytes;
-use soniox_windows::errors::SonioxWindowsErrors;
-use soniox_windows::gui::utils::get_inner_size;
-use soniox_windows::initialize_app;
-use soniox_windows::types::settings::SettingsApp;
-use soniox_windows::windows::utils::{get_screen_size, show_error};
+use sonilivetext::errors::SonioxWindowsErrors;
+use sonilivetext::gui::utils::get_inner_size;
+use sonilivetext::initialize_app;
+use sonilivetext::types::settings::SettingsApp;
+use sonilivetext::windows::utils::{get_screen_size, show_error};
 use std::sync::Arc;
 
 const FONT_BYTES: &[u8] = include_bytes!("../assets/MPLUSRounded1c-Medium.ttf");
@@ -96,7 +96,7 @@ async fn run() -> Result<(), SonioxWindowsErrors> {
 async fn main() {
     if let Err(err) = run().await {
         show_error(&format!("{}", err));
-        log::error!("error in soniox_windows!: {:?}", err);
+        log::error!("error in sonilivetext!: {:?}", err);
         std::process::exit(1);
     }
 }
