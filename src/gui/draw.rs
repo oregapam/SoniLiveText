@@ -7,7 +7,8 @@ pub(crate) fn draw_text_with_shadow<'a>(
     lines: impl Iterator<Item = &'a AudioSubtitle>,
     font_size: f32,
     text_color: Color32,
-) {
+    interim_visual_height: f32,
+) -> f32 {
     let font = FontId::proportional(font_size);
     let painter = ui.painter();
     let rect = ui.ctx().content_rect();
@@ -19,7 +20,9 @@ pub(crate) fn draw_text_with_shadow<'a>(
     let available_width = rect.width() * 0.8; // Use 80% of width
     let start_x = rect.left() + 10.0;
 
-    for line in lines {
+    let mut first_item_height = 0.0;
+
+    for (index, line) in lines.enumerate() {
         let mut text = String::new();
         if let Some(speaker) = &line.speaker {
             text.push_str(&format!("{} >> ", speaker));
@@ -27,6 +30,8 @@ pub(crate) fn draw_text_with_shadow<'a>(
         text.push_str(&line.displayed_text);
 
         if text.trim().is_empty() {
+            // Even if empty, if it's the first line, we might want to return 0.0 or font size?
+            // If empty, height is 0.
             continue;
         }
 
@@ -50,6 +55,11 @@ pub(crate) fn draw_text_with_shadow<'a>(
         // Egali galleys are drawn from top-left.
         // We want the bottom of the galley to be at current_y.
         let galley_height = galley.size().y;
+        
+        if index == 0 {
+            first_item_height = galley_height;
+        }
+
         let pos = pos2(start_x, current_y - galley_height);
 
         // Draw shadow
@@ -72,11 +82,20 @@ pub(crate) fn draw_text_with_shadow<'a>(
         painter.galley(pos, galley, text_color);
 
         // Move up for the next line, adding some spacing
-        current_y -= galley_height + (font_size * 0.2);
+        // Use smoothed height for the first item (interim), real height for others
+        let spacing_height = if index == 0 {
+             interim_visual_height
+        } else {
+             galley_height
+        };
+
+        current_y -= spacing_height + (font_size * 0.2);
         
         // Stop if we've gone above the screen
         if current_y < rect.top() {
             break;
         }
     }
+    
+    first_item_height
 }

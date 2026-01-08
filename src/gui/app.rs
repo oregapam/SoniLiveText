@@ -9,8 +9,7 @@ use eframe::{App, Frame};
 use std::time::Duration;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-const MAX_FPS: u64 = 60;
-const FRAME_TIME: Duration = Duration::from_millis(1000 / MAX_FPS);
+const POLL_INTERVAL: Duration = Duration::from_millis(20);
 
 pub struct SubtitlesApp {
     rx_transcription: UnboundedReceiver<SonioxTranscriptionResponse>,
@@ -22,6 +21,7 @@ pub struct SubtitlesApp {
     text_color: Color32,
     subtitles_state: TranscriptionState,
     show_window_border: bool,
+    interim_current_height: f32,
 }
 
 impl SubtitlesApp {
@@ -33,7 +33,21 @@ impl SubtitlesApp {
         font_size: f32,
         text_color: Color32,
         show_window_border: bool,
+        window_width: f32,
     ) -> Self {
+        // Calculate dynamic character limit for stability.
+        // Rendering uses 80% of window width.
+        // Approx char width is 0.5 * font_size.
+        // Calculate dynamic character limit for stability.
+        // Rendering uses 80% of window width.
+        // Approx char width is 0.5 * font_size.
+        // We want strict wrapping: approx 0.95 lines before freezing.
+        // This ensures that we almost always break BEFORE the visual wrap.
+        let usable_width = window_width * 0.8;
+        let avg_char_width = font_size * 0.5;
+        let chars_per_line = usable_width / avg_char_width;
+        let max_chars = (chars_per_line * 0.95) as usize;
+
         Self {
             rx_transcription,
             tx_exit,
@@ -42,8 +56,9 @@ impl SubtitlesApp {
             font_size,
             text_color,
             initialized_windows: false,
-            subtitles_state: TranscriptionState::new(50),
+            subtitles_state: TranscriptionState::new(50, max_chars),
             show_window_border,
+            interim_current_height: 0.0,
         }
     }
 }
@@ -54,6 +69,20 @@ impl App for SubtitlesApp {
         if self.show_window_border {
             app_frame = app_frame.stroke(eframe::egui::Stroke::new(2.0, self.text_color));
         }
+
+        // Debug Window
+        eframe::egui::Window::new("Debug")
+            .default_pos([50.0, 50.0])
+            .show(ctx, |ui| {
+                ui.label(format!("Max Chars/Block: {}", self.subtitles_state.get_max_chars()));
+                ui.label(format!("Active Char Count: {}", self.subtitles_state.get_active_char_count()));
+                ui.label(format!("Frozen Blocks: {}", self.subtitles_state.get_frozen_block_count()));
+                ui.label(format!("Interim Height: {:.2}", self.interim_current_height));
+                ui.label(format!("Font Size: {:.1}", self.font_size));
+                if self.subtitles_state.get_active_char_count() > self.subtitles_state.get_max_chars() {
+                    ui.colored_label(Color32::RED, "OVERFLOW / FREEZING");
+                }
+            });
 
         CentralPanel::default()
             .frame(app_frame)
@@ -68,6 +97,8 @@ impl App for SubtitlesApp {
                 }
                 if let Ok(transcription) = self.rx_transcription.try_recv() {
                     self.subtitles_state.handle_transcription(transcription);
+                    // Data changed, need repaint
+                    ctx.request_repaint();
                 }
                 
                 if self.subtitles_state.update_animation() {
@@ -75,19 +106,29 @@ impl App for SubtitlesApp {
                 }
 
                 ui.vertical(|ui| {
-                    draw_text_with_shadow(
+                    let target_height = draw_text_with_shadow(
                         ui,
                         self.subtitles_state.iter(),
                         self.font_size,
                         self.text_color,
+                        self.interim_current_height,
                     );
+                    
+                    // Smoothly animate towards target height
+                    let diff = target_height - self.interim_current_height;
+                    // If difference is significant, animate
+                    if diff.abs() > 0.1 {
+                        // Speed factor. 60 FPS. 
+                        // Move 10% of the diff per frame -> nice ease out.
+                        self.interim_current_height += diff * 0.1;
+                        ctx.request_repaint();
+                    } else {
+                        self.interim_current_height = target_height;
+                    }
                 });
                 
-                // Still request repaint for next frames if potentially animating,
-                // or just rely on the update_animation return value + generic request_repaint.
-                // But for smoother animation, we might want to keep repainting if we know things are changing.
-                // FRAME_TIME ensures we don't spin too fast.
-                ctx.request_repaint_after(FRAME_TIME);
+                // Ensure we poll for new data even if no events come in
+                ctx.request_repaint_after(POLL_INTERVAL);
             });
     }
 
