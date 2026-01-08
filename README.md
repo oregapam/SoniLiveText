@@ -47,11 +47,13 @@ Currently, SoniLiveText is distributed as source code. You will need to build it
 
 ## ⚙️ Configuration (`config.toml`)
 
-The application is controlled entirely via the `config.toml` file.
+The application is entirely controlled via the `config.toml` file.
+
+**IMPORTANT: All parameters listed below are MANDATORY.** The application will verify their presence at startup and exit with an error message if any field is missing.
 
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
-| `api_key` | String | **Required.** Your Soniox API key. |
+| `api_key` | String | Your Soniox API key. |
 | `language_hints` | Array | List of expected source languages (e.g., `["en", "ru", "hu"]`). |
 | `target_language` | String | Language code to translate into (e.g., `"hu"`). |
 | `enable_translate` | Boolean | Set to `true` to enable live translation. |
@@ -65,6 +67,7 @@ The application is controlled entirely via the `config.toml` file.
 | `window_width` | Float | Width of the subtitle area in pixels. |
 | `window_height` | Float | Height of the subtitle area in pixels. |
 | `audio_input` | String | Source: `"loopback"` (system audio) or `"microphone"`. |
+| `font_size` | Float | Font size for the text (e.g. `24.0`). |
 
 ##  CREDITS & ACKNOWLEDGEMENTS
 
