@@ -30,7 +30,7 @@ Currently, SoniLiveText is distributed as source code. You will need to build it
 
 1.  **Clone the repository:**
     ```powershell
-    git clone https://github.com/eoftgge/soniox_windows.git SoniLiveText
+    git clone https://github.com/oregapam/SoniLiveText.git SoniLiveText
     cd SoniLiveText
     ```
 
