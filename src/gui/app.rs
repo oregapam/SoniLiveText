@@ -70,19 +70,49 @@ impl App for SubtitlesApp {
             app_frame = app_frame.stroke(eframe::egui::Stroke::new(2.0, self.text_color));
         }
 
-        // Debug Window
-        eframe::egui::Window::new("Debug")
-            .default_pos([50.0, 50.0])
-            .show(ctx, |ui| {
-                ui.label(format!("Max Chars/Block: {}", self.subtitles_state.get_max_chars()));
-                ui.label(format!("Active Char Count: {}", self.subtitles_state.get_active_char_count()));
-                ui.label(format!("Frozen Blocks: {}", self.subtitles_state.get_frozen_block_count()));
-                ui.label(format!("Interim Height: {:.2}", self.interim_current_height));
-                ui.label(format!("Font Size: {:.1}", self.font_size));
-                if self.subtitles_state.get_active_char_count() > self.subtitles_state.get_max_chars() {
-                    ui.colored_label(Color32::RED, "OVERFLOW / FREEZING");
+        // Capture main window rect for debug info
+        let main_rect = ctx.input(|i| i.viewport().inner_rect.unwrap_or(eframe::egui::Rect::ZERO));
+
+        // Separate Native Debug Window
+        ctx.show_viewport_immediate(
+            eframe::egui::ViewportId::from_hash_of("debug_viewport"),
+            eframe::egui::ViewportBuilder::default()
+                .with_title("SoniLiveText Debug")
+                .with_inner_size([300.0, 500.0]),
+            |ctx, _class| {
+                eframe::egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.heading("Debug Info");
+                    ui.separator();
+                    ui.label(format!("Max Chars/Block: {}", self.subtitles_state.get_max_chars()));
+                    ui.label(format!("Active Char Count: {}", self.subtitles_state.get_active_char_count()));
+                    ui.label(format!("Frozen Blocks: {}", self.subtitles_state.get_frozen_block_count()));
+                    
+                    ui.label(format!("Main Window: {:.0} x {:.0}", main_rect.width(), main_rect.height()));
+                    
+                    ui.label(format!("Interim Height: {:.2}", self.interim_current_height));
+                    ui.label(format!("Font Size: {:.1}", self.font_size));
+                    if self.subtitles_state.get_active_char_count() > self.subtitles_state.get_max_chars() {
+                        ui.colored_label(Color32::RED, "OVERFLOW / FREEZING");
+                    }
+                    
+                    ui.separator();
+                    ui.label("Recent Events:");
+                    eframe::egui::ScrollArea::vertical().max_height(ui.available_height() - 20.0).show(ui, |ui| {
+                        for msg in self.subtitles_state.get_debug_log().iter().rev() {
+                            ui.label(eframe::egui::RichText::new(msg).size(12.0));
+                        }
+                    });
+                });
+
+                if ctx.input(|i| i.viewport().close_requested()) {
+                    // How to handle close? Just ignore or hide?
+                    // For now, let it close, but next frame it might reappear if we call this again?
+                    // Actually show_viewport_immediate re-creates it if needed.
+                    // If user closes it, maybe we should stop calling it?
+                    // But for dev, let's keep it persistent.
                 }
-            });
+            },
+        );
 
         CentralPanel::default()
             .frame(app_frame)

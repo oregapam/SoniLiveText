@@ -8,6 +8,7 @@ pub struct TranscriptionState {
     max_lines: usize,
     max_chars_in_block: usize,
     frozen_interim_history: String,
+    pub debug_log: VecDeque<String>,
 }
 
 impl TranscriptionState {
@@ -20,7 +21,19 @@ impl TranscriptionState {
             max_lines,
             max_chars_in_block,
             frozen_interim_history: String::new(),
+            debug_log: VecDeque::with_capacity(20),
         }
+    }
+
+    fn log_debug(&mut self, msg: String) {
+        if self.debug_log.len() >= 20 {
+            self.debug_log.pop_front();
+        }
+        self.debug_log.push_back(msg);
+    }
+    
+    pub fn get_debug_log(&self) -> Vec<String> {
+        self.debug_log.iter().cloned().collect()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &AudioSubtitle> {
@@ -93,19 +106,36 @@ impl TranscriptionState {
 
         if has_final {
             // Deduplicate against frozen history
-            let text_to_push = if final_text_segment.starts_with(&self.frozen_interim_history) {
-                final_text_segment[self.frozen_interim_history.len()..].to_string()
+            if final_text_segment.starts_with(&self.frozen_interim_history) {
+                 // CASE 1: Final is longer or equal to history. 
+                 // We kept the prefix safe, now just push the new suffix.
+                 let text_to_push = final_text_segment[self.frozen_interim_history.len()..].to_string();
+                 self.log_debug(format!("FINAL extends history. Pushing suffix: '{}'", text_to_push));
+                 self.push_final(final_speaker.clone(), text_to_push, true);
+                 self.frozen_interim_history.clear();
+                 
+            } else if self.frozen_interim_history.starts_with(&final_text_segment) {
+                 // CASE 2: History is LONGER than Final (Aggressive freeze).
+                 // We already displayed this part. Do NOT push it again.
+                 // Just remove it from history so we expect the *rest* later.
+                 self.log_debug(format!("FINAL covered by history. Consuming prefix: '{}' (Remaining history: {})", 
+                    final_text_segment, 
+                    self.frozen_interim_history.len() - final_text_segment.len()
+                 ));
+                 // Drain the prefix from history
+                 self.frozen_interim_history.drain(..final_text_segment.len());
+                 // Do not clear history!
+                 // Do not push final!
+                 
             } else {
-                final_text_segment
-            };
+                // CASE 3: Mismatch.
+                self.log_debug(format!("FINAL mismatch. History: '{}', Final: '{}'. Pushing Final.", 
+                    self.frozen_interim_history, final_text_segment));
+                self.push_final(final_speaker.clone(), final_text_segment, true);
+                self.frozen_interim_history.clear();
+            }
             
-            // Finalize: Instant=true because it was likely shown as interim
-            self.push_final(final_speaker.clone(), text_to_push, true);
-            
-            // Clear history because the segment is finalized
-            self.frozen_interim_history.clear();
-            
-            // Also clear interim line because we have a final
+            // Also clear interim line because we have a final (or consumed it)
             self.update_interim(interim_speaker.clone(), String::new());
         }
 
@@ -129,6 +159,8 @@ impl TranscriptionState {
                     let (frozen_chunk, remainder) = effective_interim.split_at(idx);
                     let frozen_chunk_str = frozen_chunk.to_string();
                     
+                    self.log_debug(format!("FREEZE INTERIM. Chunk: '{}' (len: {})", frozen_chunk_str, frozen_chunk_str.len()));
+
                     self.frozen_interim_history.push_str(&frozen_chunk_str);
                     
                     // Freeze chunk: Instant=true! It was already visible.
@@ -154,7 +186,20 @@ impl TranscriptionState {
 
         let should_start_new = match self.finishes_lines.front() {
             Some(last) => {
-                last.speaker != speaker || (last.text.len() + text.len()) > self.max_chars_in_block
+                let current_len = last.text.len();
+                let new_len = current_len + text.len();
+                let limit = self.max_chars_in_block;
+                
+                if last.speaker != speaker {
+                    self.log_debug("New Block: Speaker changed".to_string());
+                    true
+                } else if new_len > limit {
+                    let last_word = last.text.split_whitespace().last().unwrap_or("<empty>");
+                    self.log_debug(format!("New Block: Overflow. {} + {} > {}. Last word: '{}'", current_len, text.len(), limit, last_word));
+                    true
+                } else {
+                    false
+                }
             }
             None => true,
         };
