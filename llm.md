@@ -76,6 +76,9 @@ If you are asked to modify specific features, look in these locations:
 *   **modifying API Request:**
     - Look at `src/soniox/request.rs` to change what parameters (like `target_language`) are sent to the server.
 
+*   **Documentation Updates:**
+    - **CRITICAL:** If you implement changes or new features that are relevant to the end-user (basic usage), you **MUST** update `README.md` to reflect these changes immediately.
+
 *   **Post-Update / Release Workflow:**
     - After completing code changes/updates, ALWAYS offer the user to run `cargo build --release`.
     - **Config Handling:** If the user agrees to the build:
