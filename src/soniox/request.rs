@@ -33,7 +33,7 @@ pub(crate) fn create_request(
         enable_non_final_tokens: Some(true),
         ..Default::default()
     };
-    if settings.enable_translate {
+    if settings.enable_translate() {
         request.translation = Some(SonioxTranslationObject {
             r#type: "one_way",
             target_language: Some(settings.target_language()),

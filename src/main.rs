@@ -17,15 +17,13 @@ async fn run() -> Result<(), SonioxWindowsErrors> {
     let settings = SettingsApp::new("config.toml")?;
     let (width, height) = get_screen_size();
     
-    let window_width = match settings.window_width() {
-        Some(w) => w,
-        None => {
-            let msg = "Missing 'window_width' in config.toml! This parameter is required.";
-            show_error(msg);
-            log::error!("{}", msg);
-            std::process::exit(1);
-        }
-    };
+    if let Err(msg) = settings.validate() {
+        show_error(&msg);
+        log::error!("{}", msg);
+        std::process::exit(1);
+    }
+
+    let window_width = settings.window_width().unwrap();
     let window_height = settings.window_height();
     
     // With mandatory width, get_inner_size is simpler.
