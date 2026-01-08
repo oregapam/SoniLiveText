@@ -55,7 +55,7 @@ font_size = 24.0
 # If true, the window tries to stay on top of other applications
 enable_high_priority = true
 
-# If true, draws a visible border around the window (useful for debugging positioning)
+# If true, draws a visible border (in color of text_color) around the window (useful for debugging positioning)
 show_window_border = false
 
 
