@@ -66,15 +66,22 @@ If you are asked to modify specific features, look in these locations:
 
 *   **Adding a new Setting:**
     1.  Add field to `SettingsApp` in `src/types/settings.rs`.
-    2.  Update `validate()` method in the same file.
+    2.  Update `validate()` method in the same file. **IMPORTANT:** All configuration parameters (variables) MUST be mandatory in `config.toml`. The `validate()` method must return an error if any field is missing or invalid. Use defaults only where absolutely necessary, but prefer explicit user configuration.
     3.  Update usages in `main.rs` or wherever the setting is consumed.
     4.  Update `config.toml.example`.
 
 *   **Changing Window Behavior:**
     - Code controlling window attributes (always-on-top, transparency) is primarily in `src/main.rs` (initial setup) and potentially `src/gui/` if updated at runtime.
 
-*   ** modifying API Request:**
+*   **modifying API Request:**
     - Look at `src/soniox/request.rs` to change what parameters (like `target_language`) are sent to the server.
+
+*   **Post-Update / Release Workflow:**
+    - After completing code changes/updates, ALWAYS offer the user to run `cargo build --release`.
+    - **Config Handling:** If the user agrees to the build:
+        1. Check if `target/release/config.toml` exists.
+        2. **ONLY** copy `config.toml` (from root) to `target/release/config.toml` if it DOES NOT exist in the destination. Never overwrite the release config automatically.
+    - **Execution:** Do NOT offer to run the application via `cargo run` (debug) or by launching the executable yourself. Instead, instruct the user to navigate to the `target/release` folder and execute the `.exe` manually.
 
 ---
 
@@ -83,5 +90,6 @@ If you are asked to modify specific features, look in these locations:
 *   **Crate Name:** The project package name in `Cargo.toml` is `sonilivetext`. In code, imports refer to `sonilivetext::...`.
 *   **Error Handling:** The project uses specific error types defined in `src/errors.rs`.
 *   **Async:** The project relies heavily on `tokio` for async runtime.
+*   **Configuration Rules:** All configuration parameters (current and future) are **MANDATORY**. Implementing `validate()` to enforce this is required for every new setting.
 
 When starting a task, verify the file content in these locations to get the latest context.
