@@ -74,6 +74,10 @@ impl TranscriptionState {
         self.max_chars_in_block
     }
 
+    pub fn set_max_chars(&mut self, max_chars: usize) {
+        self.max_chars_in_block = max_chars;
+    }
+
     pub fn handle_transcription(&mut self, response: SonioxTranscriptionResponse) {
         let mut full_interim_text = String::new();
         let mut interim_speaker = Option::<String>::None;

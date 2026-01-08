@@ -23,6 +23,7 @@ pub struct SettingsApp {
     pub(crate) window_offset: Option<(f32, f32)>,
     pub(crate) audio_input: Option<String>,
     pub(crate) show_window_border: Option<bool>,
+    pub(crate) debug_window: Option<bool>,
 }
 
 impl SettingsApp {
@@ -53,6 +54,7 @@ impl SettingsApp {
         if self.window_offset.is_none() { missing_fields.push("window_offset"); }
         if self.audio_input.is_none() { missing_fields.push("audio_input"); }
         if self.show_window_border.is_none() { missing_fields.push("show_window_border"); }
+        if self.debug_window.is_none() { missing_fields.push("debug_window"); }
 
 
         if !missing_fields.is_empty() {
@@ -87,6 +89,10 @@ impl SettingsApp {
 
     pub fn enable_high_priority(&self) -> bool {
         self.enable_high_priority.expect("Validated")
+    }
+
+    pub fn debug_window(&self) -> bool {
+        self.debug_window.expect("Validated")
     }
 
     pub fn font_size(&self) -> f32 {

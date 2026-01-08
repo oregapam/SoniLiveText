@@ -58,6 +58,10 @@ enable_high_priority = true
 # If true, draws a visible border (in color of text_color) around the window (useful for debugging positioning)
 show_window_border = false
 
+# If true, shows a separate "Debug Info" window with real-time logs and metrics
+# This window is always on top.
+debug_window = false
+
 
 # ==========================================
 # SYSTEM & AUDIO SETTINGS

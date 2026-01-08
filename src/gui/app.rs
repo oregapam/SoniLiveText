@@ -22,6 +22,7 @@ pub struct SubtitlesApp {
     subtitles_state: TranscriptionState,
     show_window_border: bool,
     interim_current_height: f32,
+    debug_window_enabled: bool,
 }
 
 impl SubtitlesApp {
@@ -34,6 +35,7 @@ impl SubtitlesApp {
         text_color: Color32,
         show_window_border: bool,
         window_width: f32,
+        debug_window_enabled: bool,
     ) -> Self {
         // Calculate dynamic character limit for stability.
         // Rendering uses 80% of window width.
@@ -59,6 +61,7 @@ impl SubtitlesApp {
             subtitles_state: TranscriptionState::new(50, max_chars),
             show_window_border,
             interim_current_height: 0.0,
+            debug_window_enabled,
         }
     }
 }
@@ -73,46 +76,57 @@ impl App for SubtitlesApp {
         // Capture main window rect for debug info
         let main_rect = ctx.input(|i| i.viewport().inner_rect.unwrap_or(eframe::egui::Rect::ZERO));
 
-        // Separate Native Debug Window
-        ctx.show_viewport_immediate(
-            eframe::egui::ViewportId::from_hash_of("debug_viewport"),
-            eframe::egui::ViewportBuilder::default()
-                .with_title("SoniLiveText Debug")
-                .with_inner_size([300.0, 500.0]),
-            |ctx, _class| {
-                eframe::egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.heading("Debug Info");
-                    ui.separator();
-                    ui.label(format!("Max Chars/Block: {}", self.subtitles_state.get_max_chars()));
-                    ui.label(format!("Active Char Count: {}", self.subtitles_state.get_active_char_count()));
-                    ui.label(format!("Frozen Blocks: {}", self.subtitles_state.get_frozen_block_count()));
-                    
-                    ui.label(format!("Main Window: {:.0} x {:.0}", main_rect.width(), main_rect.height()));
-                    
-                    ui.label(format!("Interim Height: {:.2}", self.interim_current_height));
-                    ui.label(format!("Font Size: {:.1}", self.font_size));
-                    if self.subtitles_state.get_active_char_count() > self.subtitles_state.get_max_chars() {
-                        ui.colored_label(Color32::RED, "OVERFLOW / FREEZING");
-                    }
-                    
-                    ui.separator();
-                    ui.label("Recent Events:");
-                    eframe::egui::ScrollArea::vertical().max_height(ui.available_height() - 20.0).show(ui, |ui| {
-                        for msg in self.subtitles_state.get_debug_log().iter().rev() {
-                            ui.label(eframe::egui::RichText::new(msg).size(12.0));
-                        }
-                    });
-                });
+        // Dynamically update max_chars based on current window width
+        // REVERTED to previous "stable" visuals (0.8 width, 0.5 char, 0.95 safety)
+        let usable_width = main_rect.width() * 0.8; 
+        let avg_char_width = self.font_size * 0.5;
+        let chars_per_line = usable_width / avg_char_width;
+        let max_chars = (chars_per_line * 0.95) as usize;
+        self.subtitles_state.set_max_chars(max_chars);
 
-                if ctx.input(|i| i.viewport().close_requested()) {
-                    // How to handle close? Just ignore or hide?
-                    // For now, let it close, but next frame it might reappear if we call this again?
-                    // Actually show_viewport_immediate re-creates it if needed.
-                    // If user closes it, maybe we should stop calling it?
-                    // But for dev, let's keep it persistent.
-                }
-            },
-        );
+        // Separate Native Debug Window
+        if self.debug_window_enabled {
+            ctx.show_viewport_immediate(
+                eframe::egui::ViewportId::from_hash_of("debug_viewport"),
+                eframe::egui::ViewportBuilder::default()
+                    .with_title("SoniLiveText Debug")
+                    .with_inner_size([300.0, 500.0])
+                    .with_always_on_top(),
+                |ctx, _class| {
+                    eframe::egui::CentralPanel::default().show(ctx, |ui| {
+                        ui.heading("Debug Info");
+                        ui.separator();
+                        ui.label(format!("Max Chars/Block: {}", self.subtitles_state.get_max_chars()));
+                        ui.label(format!("Active Char Count: {}", self.subtitles_state.get_active_char_count()));
+                        ui.label(format!("Frozen Blocks: {}", self.subtitles_state.get_frozen_block_count()));
+                        
+                        ui.label(format!("Main Window: {:.0} x {:.0}", main_rect.width(), main_rect.height()));
+                        
+                        ui.label(format!("Interim Height: {:.2}", self.interim_current_height));
+                        ui.label(format!("Font Size: {:.1}", self.font_size));
+                        if self.subtitles_state.get_active_char_count() > self.subtitles_state.get_max_chars() {
+                            ui.colored_label(Color32::RED, "OVERFLOW / FREEZING");
+                        }
+                        
+                        ui.separator();
+                        ui.label("Recent Events:");
+                        eframe::egui::ScrollArea::vertical().max_height(ui.available_height() - 20.0).show(ui, |ui| {
+                            for msg in self.subtitles_state.get_debug_log().iter().rev() {
+                                ui.label(eframe::egui::RichText::new(msg).size(12.0));
+                            }
+                        });
+                    });
+
+                    if ctx.input(|i| i.viewport().close_requested()) {
+                        // How to handle close? Just ignore or hide?
+                        // For now, let it close, but next frame it might reappear if we call this again?
+                        // Actually show_viewport_immediate re-creates it if needed.
+                        // If user closes it, maybe we should stop calling it?
+                        // But for dev, let's keep it persistent.
+                    }
+                },
+            );
+        }
 
         CentralPanel::default()
             .frame(app_frame)
