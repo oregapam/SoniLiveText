@@ -154,11 +154,21 @@ impl TranscriptionState {
         }
 
         if !full_interim_text.is_empty() {
-             let effective_interim = if full_interim_text.starts_with(&self.frozen_interim_history) {
-                full_interim_text[self.frozen_interim_history.len()..].to_string()
-            } else {
-                full_interim_text.clone()
-            };
+             // Check if interim matches our frozen history
+             if !full_interim_text.starts_with(&self.frozen_interim_history) {
+                 self.log_debug(format!("Interim mismatch! Resetting {} ghosts. H: '{}' N: '{}'", 
+                    self.frozen_blocks_count, self.frozen_interim_history, full_interim_text));
+                 
+                 // Retroactively fix the drift
+                 for _ in 0..self.frozen_blocks_count {
+                     self.finishes_lines.pop_front();
+                 }
+                 self.frozen_blocks_count = 0;
+                 self.frozen_interim_history.clear();
+             }
+
+             // Now we are synced (history is empty or a valid prefix)
+             let effective_interim = full_interim_text[self.frozen_interim_history.len()..].to_string();
 
             let limit = self.max_chars_in_block;
             let safety_buffer = 15; 
@@ -257,19 +267,34 @@ impl TranscriptionState {
                 Some(last) => {
                     // Start new if:
                     // 1. Speaker changed
-                    // 2. Length would exceed limit
+                    // 2. Length would exceed limit (UNLESS mid-word)
                     // 3. Last block ended with sentence punctuation (.?!) -> FORCE NEW LINE
                     let ends_sentence = last.text.trim_end().ends_with(|c| c == '.' || c == '?' || c == '!');
+                    let is_continuation = !last.text.is_empty() 
+                        && !last.text.ends_with(char::is_whitespace) 
+                        && !chunk.starts_with(char::is_whitespace);
                     
                     if last.speaker != speaker {
                         self.log_debug("New Block: Speaker changed".to_string());
                         true
                     } else if (last.text.len() + chunk.len()) > self.max_chars_in_block {
-                         let last_word = last.text.split_whitespace().last().unwrap_or("<empty>");
-                         self.log_debug(format!("New Block: Overflow. {} + {} > {}. Last: '{}'", 
-                            last.text.len(), chunk.len(), self.max_chars_in_block, last_word));
-                        true
+                        if is_continuation {
+                            // Exceptional case: We are in the middle of a word (e.g. "vis" + "ion").
+                            // Do NOT split. Append even if it overflows.
+                            let last_word = last.text.split_whitespace().last().unwrap_or("<empty>");
+                            self.log_debug(format!("Overflow ignored (Mid-word): '{}' + '{}'", last_word, chunk));
+                            false
+                        } else {
+                             let last_word = last.text.split_whitespace().last().unwrap_or("<empty>");
+                             self.log_debug(format!("New Block: Overflow. {} + {} > {}. Last: '{}'", 
+                                last.text.len(), chunk.len(), self.max_chars_in_block, last_word));
+                            true
+                        }
                     } else if ends_sentence {
+                        // If we are mid-word (e.g. "Dr." + "Smith"), maybe don't split?
+                        // But usually sentence end implies space. "text." + " Next".
+                        // If "text." + "Next" (no space), it's weird. 
+                        // Let's trust the sentence split logic.
                         self.log_debug("New Block: Sentence ends previous line.".to_string());
                         true
                     } else {
