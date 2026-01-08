@@ -14,7 +14,8 @@ Unlike standard windows, SoniLiveText renders text directly onto the screen back
 *   **"Ghost" Overlay**: Subtitles are drawn on a click-through, transparent layer. It floats above other windows (or at the bottom) without stealing focus or blocking mouse interactions.
 *   **High-Accuracy AI Transcription**: Leverages the Soniox API for state-of-the-art speech recognition.
 *   **Live Translation**: Instantly translate spoken text into your target language.
-*   **Speaker Identification**: distinguishing between different speakers in a conversation.
+*   **Typewriter Animation**: Experience smooth, comfortable reading with a typewriter-style text appearance effect that reduces eye strain compared to sudden text blocks.
+*   **Speaker Identification**: Distinguishes between different speakers in a conversation.
 *   **Resilient Connectivity**: Automatically reconnects if the server connection drops.
 *   **Highly Configurable**: Customize window position, size, colors, fonts, and behavior via a simple configuration file.
 *   **Microphone Support**: Can optionally switch to microphone input for dictation or meeting transcription.
@@ -60,6 +61,7 @@ The application is entirely controlled via the `config.toml` file.
 | `context` | String | Context hint for the AI to improve accuracy (e.g., specific terminology). |
 | `level` | String | Logging level (e.g., `"debug"`, `"info"`). |
 | `enable_high_priority`| Boolean | If `true`, the window tries to stay on top of other applications. |
+| `show_window_border` | Boolean | If `true`, draws a border (useful for positioning). |
 | `enable_speakers` | Boolean | If `true`, attempts to identify and label different speakers. |
 | `text_color` | Array | RGB text color, e.g., `[255, 255, 0]` for yellow. |
 | `window_anchor` | String | Positioning anchor: `bottom_center`, `top_left`, `center`, etc. |
