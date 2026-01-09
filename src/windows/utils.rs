@@ -93,6 +93,10 @@ pub fn show_error(msg: &str) {
 }
 
 pub fn get_screen_size() -> (usize, usize) {
+    // SAFETY:
+    // GetSystemMetrics is a safe FFI function that returns an integer (c_int).
+    // It does not dereference pointers or modify memory, so it cannot cause undefined behavior of that sort.
+    // It simply queries the system for metrics.
     let (width, height) = unsafe { (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)) };
     (width as usize, height as usize)
 }
