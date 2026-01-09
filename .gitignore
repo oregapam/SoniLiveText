@@ -3,3 +3,6 @@
 Cargo.lock
 config.toml
 run.log
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
