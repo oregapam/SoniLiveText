@@ -62,6 +62,11 @@ show_window_border = false
 # This window is always on top.
 debug_window = false
 
+# Smart Buffering Delay (in milliseconds)
+# Delays display of interim text to allow for more stable corrections.
+# Suggested: 0 (instant) or 200-500 (more stable).
+smart_delay_ms = 0
+
 
 # ==========================================
 # SYSTEM & AUDIO SETTINGS

@@ -24,6 +24,7 @@ pub struct SettingsApp {
     pub(crate) audio_input: Option<String>,
     pub(crate) show_window_border: Option<bool>,
     pub(crate) debug_window: Option<bool>,
+    pub(crate) smart_delay_ms: Option<u64>,
 }
 
 impl SettingsApp {
@@ -55,6 +56,7 @@ impl SettingsApp {
         if self.audio_input.is_none() { missing_fields.push("audio_input"); }
         if self.show_window_border.is_none() { missing_fields.push("show_window_border"); }
         if self.debug_window.is_none() { missing_fields.push("debug_window"); }
+        if self.smart_delay_ms.is_none() { missing_fields.push("smart_delay_ms"); }
 
 
         if !missing_fields.is_empty() {
@@ -93,6 +95,10 @@ impl SettingsApp {
 
     pub fn debug_window(&self) -> bool {
         self.debug_window.expect("Validated")
+    }
+
+    pub fn smart_delay_ms(&self) -> u64 {
+        self.smart_delay_ms.expect("Validated")
     }
 
     pub fn font_size(&self) -> f32 {

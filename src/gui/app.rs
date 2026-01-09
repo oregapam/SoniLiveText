@@ -36,6 +36,7 @@ impl SubtitlesApp {
         show_window_border: bool,
         window_width: f32,
         debug_window_enabled: bool,
+        smart_delay_ms: u64,
     ) -> Self {
         // Calculate dynamic character limit for stability.
         // Rendering uses 80% of window width.
@@ -45,10 +46,15 @@ impl SubtitlesApp {
         // Approx char width is 0.5 * font_size.
         // We want strict wrapping: approx 0.95 lines before freezing.
         // This ensures that we almost always break BEFORE the visual wrap.
-        let usable_width = window_width * 0.8;
-        let avg_char_width = font_size * 0.5;
+        // TUNING: 0.88 width (leaving 6% margin each side) + 0.46 char width factor.
+        // This allows ~46-50 chars per line at 1000px width.
+        let usable_width = window_width * 0.88;
+        let avg_char_width = font_size * 0.46;
         let chars_per_line = usable_width / avg_char_width;
-        let max_chars = (chars_per_line * 0.95) as usize;
+        let max_chars = ((chars_per_line * 0.95) as usize).max(50);
+
+        let mut subtitles_state = TranscriptionState::new(50, max_chars);
+        subtitles_state.set_smart_delay(smart_delay_ms);
 
         Self {
             rx_transcription,
@@ -58,7 +64,7 @@ impl SubtitlesApp {
             font_size,
             text_color,
             initialized_windows: false,
-            subtitles_state: TranscriptionState::new(50, max_chars),
+            subtitles_state,
             show_window_border,
             interim_current_height: 0.0,
             debug_window_enabled,
@@ -77,11 +83,13 @@ impl App for SubtitlesApp {
         let main_rect = ctx.input(|i| i.viewport().inner_rect.unwrap_or(eframe::egui::Rect::ZERO));
 
         // Dynamically update max_chars based on current window width
-        // REVERTED to previous "stable" visuals (0.8 width, 0.5 char, 0.95 safety)
-        let usable_width = main_rect.width() * 0.8; 
-        let avg_char_width = self.font_size * 0.5;
+        // Middle Ground Tuning: 88% width, 0.46 char width factor.
+        // This allows more text than the conservative default (0.8/0.5) 
+        // Recalculate max chars based on current window width
+        let usable_width = main_rect.width() * 0.88;
+        let avg_char_width = self.font_size * 0.46;
         let chars_per_line = usable_width / avg_char_width;
-        let max_chars = (chars_per_line * 0.95) as usize;
+        let max_chars = ((chars_per_line * 0.95) as usize).max(50);
         self.subtitles_state.set_max_chars(max_chars);
 
         // Separate Native Debug Window

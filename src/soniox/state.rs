@@ -1,6 +1,7 @@
 use crate::types::audio::AudioSubtitle;
 use crate::types::soniox::SonioxTranscriptionResponse;
 use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 
 pub struct TranscriptionState {
     finishes_lines: VecDeque<AudioSubtitle>,
@@ -10,6 +11,8 @@ pub struct TranscriptionState {
     frozen_interim_history: String,
     frozen_blocks_count: usize,
     pub debug_log: VecDeque<String>,
+    event_queue: VecDeque<(Instant, SonioxTranscriptionResponse)>,
+    smart_delay_ms: u64,
 }
 
 impl TranscriptionState {
@@ -24,6 +27,8 @@ impl TranscriptionState {
             frozen_interim_history: String::new(),
             frozen_blocks_count: 0,
             debug_log: VecDeque::with_capacity(20),
+            event_queue: VecDeque::new(),
+            smart_delay_ms: 0,
         }
     }
 
@@ -42,7 +47,24 @@ impl TranscriptionState {
         std::iter::once(&self.interim_line).chain(&self.finishes_lines)
     }
 
+    pub fn process_pending_events(&mut self) {
+        let now = Instant::now();
+        let delay = Duration::from_millis(self.smart_delay_ms);
+
+        while let Some((timestamp, _)) = self.event_queue.front() {
+            if now.duration_since(*timestamp) >= delay {
+                let (_, response) = self.event_queue.pop_front().unwrap();
+                self.process_transcription_event(response);
+            } else {
+                break;
+            }
+        }
+    }
+
     pub fn update_animation(&mut self) -> bool {
+        // Process buffered events first
+        self.process_pending_events();
+
         let mut request_repaint = false;
         if self.interim_line.update_animation() {
             request_repaint = true;
@@ -78,7 +100,50 @@ impl TranscriptionState {
         self.max_chars_in_block = max_chars;
     }
 
+    pub fn set_smart_delay(&mut self, delay_ms: u64) {
+        self.smart_delay_ms = delay_ms;
+    }
+
     pub fn handle_transcription(&mut self, response: SonioxTranscriptionResponse) {
+        // Smart Buffering & Collapsing Logic
+        // If the NEW response is purely Interim (no final parts), check if the last queued item is also purely Interim.
+        // If so, and speaker matches, we can REPLACE the old one with the new one.
+        // This effectively "collapses" the jittery intermediate updates.
+        
+        let is_purely_interim = !response.tokens.iter().any(|t| t.is_final);
+        
+        if is_purely_interim {
+            if let Some((_, last_response)) = self.event_queue.back_mut() {
+                let last_is_purely_interim = !last_response.tokens.iter().any(|t| t.is_final);
+                if last_is_purely_interim {
+                    // Check speaker match (heuristic: check first token speaker)
+                    let new_speaker = response.tokens.first().map(|t| &t.speaker);
+                    let last_speaker = last_response.tokens.first().map(|t| &t.speaker);
+                    
+                    if new_speaker == last_speaker {
+                        // COLLAPSE: Update the text content, keep the timestamp? 
+                        // If we keep timestamp, we process it sooner (good for latency).
+                        // If we update timestamp, we delay it more (good for stability).
+                        // Decision: Update timestamp to ensure the *new* text gets its full delay time to settle.
+                        *last_response = response;
+                        // Actually, we should probably update the timestamp to `now` if we want "stability delay".
+                        // If we keep old timestamp, it might process immediately if old one was about to expire.
+                        // Let's UPDATE timestamp to `Instant::now()` so the new text has to prove its stability.
+                        // Wait, if we keep resetting timestamp, a constantly changing interim will NEVER appear?
+                        // That's bad. The user wants to see it eventually.
+                        // Better: Keep the ORIGINAL timestamp. The "slot" is due to be displayed. We just show the latest info in that slot.
+                        // This minimizes latency.
+                        // NO OP on timestamp.
+                        return;
+                    }
+                }
+            }
+        }
+
+        self.event_queue.push_back((Instant::now(), response));
+    }
+
+    fn process_transcription_event(&mut self, response: SonioxTranscriptionResponse) {
         let mut full_interim_text = String::new();
         let mut interim_speaker = Option::<String>::None;
         
@@ -174,8 +239,11 @@ impl TranscriptionState {
              // Now we are synced (history is empty or a valid prefix)
              let effective_interim = full_interim_text[self.frozen_interim_history.len()..].to_string();
 
-            let limit = self.max_chars_in_block;
-            let safety_buffer = 15; 
+             let limit = self.max_chars_in_block;
+            // Increased safety buffer to prevent premature freezing of sentences.
+            // If it fits within limit + 25 chars, we let it flow to push_final 
+            // where we have "orphan guard" logic.
+            let safety_buffer = 25; 
             
             // PRIORITY 1: Freeze at Sentence End (if available and fits)
             // Look for [.?!] followed by whitespace (or end? No, need stability)
@@ -200,7 +268,9 @@ impl TranscriptionState {
                 let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, true);
                 self.frozen_blocks_count += added;
                 
+                // UN-HIDE: Show interim tail for real-time feedback
                 self.update_interim(interim_speaker, remainder.to_string());
+                // self.update_interim(interim_speaker, String::new());
                 
             } else if effective_interim.len() > limit + safety_buffer {
                 // PRIORITY 2: Freeze at Limit (Overflow preventer)
@@ -220,12 +290,18 @@ impl TranscriptionState {
                     let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, true);
                     self.frozen_blocks_count += added;
                     
+                    // UN-HIDE: Show interim tail for real-time feedback
                     self.update_interim(interim_speaker, remainder.to_string());
+                    // self.update_interim(interim_speaker, String::new());
                 } else {
+                     // UN-HIDE: Show interim
                      self.update_interim(interim_speaker, effective_interim);
+                     // self.update_interim(interim_speaker, String::new());
                 }
             } else {
+                // UN-HIDE: Show interim
                 self.update_interim(interim_speaker, effective_interim);
+                // self.update_interim(interim_speaker, String::new());
             }
         } else if has_final {
         } else {
@@ -246,22 +322,31 @@ impl TranscriptionState {
              if text.is_empty() { break; }
 
              let (chunk, remainder) = if text.len() > self.max_chars_in_block {
-                 // Too long, must split
-                 let limit = self.max_chars_in_block;
-                 let split_idx = text.char_indices()
-                    .filter(|(i, c)| *i <= limit && c.is_whitespace())
-                    .map(|(i, _)| i)
-                    .last()
-                    .or_else(|| {
-                        text.char_indices()
-                            .filter(|(i, c)| *i > limit && *i < limit + 10 && c.is_whitespace())
-                            .map(|(i, _)| i)
-                            .next()
-                    })
-                    .unwrap_or(limit.min(text.len()));
-                 
-                 let (c, r) = text.split_at(split_idx);
-                 (c.to_string(), Some(r.to_string()))
+                 // ORPHAN GUARD:
+                 // If the text is only slightly longer than the limit (e.g. +15 chars),
+                 // and it's a single sentence/phrase, forcing a split creates a small "orphan" line on the next block.
+                 // We prefer to keep it as ONE block and let the UI wrapping handle it effectively.
+                 // This reduces the "stairs" effect.
+                 if text.len() <= self.max_chars_in_block + 15 {
+                     (text, None)
+                 } else {
+                     // Too long, must split
+                     let limit = self.max_chars_in_block;
+                     let split_idx = text.char_indices()
+                        .filter(|(i, c)| *i <= limit && c.is_whitespace())
+                        .map(|(i, _)| i)
+                        .last()
+                        .or_else(|| {
+                            text.char_indices()
+                                .filter(|(i, c)| *i > limit && *i < limit + 10 && c.is_whitespace())
+                                .map(|(i, _)| i)
+                                .next()
+                        })
+                        .unwrap_or(limit.min(text.len()));
+                     
+                     let (c, r) = text.split_at(split_idx);
+                     (c.to_string(), Some(r.to_string()))
+                 }
              } else {
                  (text, None)
              };
@@ -278,10 +363,16 @@ impl TranscriptionState {
                         && !last.text.ends_with(char::is_whitespace) 
                         && !chunk.starts_with(char::is_whitespace);
                     
-                    if last.speaker != speaker {
-                        self.log_debug("New Block: Speaker changed".to_string());
-                        true
-                    } else if (last.text.len() + chunk.len()) > self.max_chars_in_block {
+                    // Loose speaker matching logic removed as we now ignore speaker changes entirely.
+
+                    // USER REQUEST: Ignore speaker changes.
+                    // Only start new block if:
+                    // 1. Line overflow (checked below)
+                    // 2. Previous block ended with sentence punctuation (.?!)
+                    
+                    // Note: We intentionally IGNORE speaker differences here to keep the flow.
+                    
+                    if (last.text.len() + chunk.len()) > self.max_chars_in_block + 15 {
                         if is_continuation {
                             // Exceptional case: We are in the middle of a word (e.g. "vis" + "ion").
                             // Do NOT split. Append even if it overflows.
@@ -295,13 +386,10 @@ impl TranscriptionState {
                             true
                         }
                     } else if ends_sentence {
-                        // If we are mid-word (e.g. "Dr." + "Smith"), maybe don't split?
-                        // But usually sentence end implies space. "text." + " Next".
-                        // If "text." + "Next" (no space), it's weird. 
-                        // Let's trust the sentence split logic.
                         self.log_debug("New Block: Sentence ends previous line.".to_string());
                         true
                     } else {
+                        // Merge!
                         false
                     }
                 }
@@ -310,6 +398,10 @@ impl TranscriptionState {
 
             if !should_start_new {
                 let last = self.finishes_lines.front_mut().unwrap();
+                // Smart merge: ensure space separator if needed
+                if !last.text.ends_with(char::is_whitespace) && !chunk.starts_with(char::is_whitespace) {
+                    last.text.push(' ');
+                }
                 last.text.push_str(&chunk);
                 if instant {
                     last.displayed_text = last.text.clone();
@@ -360,3 +452,6 @@ impl TranscriptionState {
         }
     }
 }
+
+
+
