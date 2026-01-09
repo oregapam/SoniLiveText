@@ -37,17 +37,10 @@ impl SubtitlesApp {
         window_width: f32,
         debug_window_enabled: bool,
         smart_delay_ms: u64,
+        show_interim: bool,
+        stability_timeout_ms: u64,
     ) -> Self {
-        // Calculate dynamic character limit for stability.
-        // Rendering uses 80% of window width.
-        // Approx char width is 0.5 * font_size.
-        // Calculate dynamic character limit for stability.
-        // Rendering uses 80% of window width.
-        // Approx char width is 0.5 * font_size.
-        // We want strict wrapping: approx 0.95 lines before freezing.
-        // This ensures that we almost always break BEFORE the visual wrap.
-        // TUNING: 0.88 width (leaving 6% margin each side) + 0.46 char width factor.
-        // This allows ~46-50 chars per line at 1000px width.
+        // ... (preserving logic)
         let usable_width = window_width * 0.88;
         let avg_char_width = font_size * 0.46;
         let chars_per_line = usable_width / avg_char_width;
@@ -55,6 +48,7 @@ impl SubtitlesApp {
 
         let mut subtitles_state = TranscriptionState::new(50, max_chars);
         subtitles_state.set_smart_delay(smart_delay_ms);
+        subtitles_state.set_stability_params(show_interim, stability_timeout_ms);
 
         Self {
             rx_transcription,

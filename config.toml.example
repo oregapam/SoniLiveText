@@ -67,6 +67,16 @@ debug_window = false
 # Suggested: 0 (instant) or 200-500 (more stable).
 smart_delay_ms = 0
 
+# If true, shows the tentative "interim" text as it's being recognized.
+# If false, only finalized or stabilized sentences are shown.
+show_interim = false
+
+# Stability Timeout (in milliseconds)
+# After this much silence/inactivity, the interim text is considered "final"
+# and is typed out normally.
+# Suggested: 1000 (1 second).
+stability_timeout_ms = 1000
+
 
 # ==========================================
 # SYSTEM & AUDIO SETTINGS

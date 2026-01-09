@@ -42,6 +42,8 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
         settings.window_width(),
         settings.debug_window(),
         settings.smart_delay_ms(),
+        settings.show_interim(),
+        settings.stability_timeout_ms(),
     );
     let audio_input = settings.audio_input().to_string();
     tokio::task::spawn_blocking(move || {

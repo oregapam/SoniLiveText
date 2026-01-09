@@ -25,6 +25,8 @@ pub struct SettingsApp {
     pub(crate) show_window_border: Option<bool>,
     pub(crate) debug_window: Option<bool>,
     pub(crate) smart_delay_ms: Option<u64>,
+    pub(crate) show_interim: Option<bool>,
+    pub(crate) stability_timeout_ms: Option<u64>,
 }
 
 impl SettingsApp {
@@ -57,6 +59,8 @@ impl SettingsApp {
         if self.show_window_border.is_none() { missing_fields.push("show_window_border"); }
         if self.debug_window.is_none() { missing_fields.push("debug_window"); }
         if self.smart_delay_ms.is_none() { missing_fields.push("smart_delay_ms"); }
+        if self.show_interim.is_none() { missing_fields.push("show_interim"); }
+        if self.stability_timeout_ms.is_none() { missing_fields.push("stability_timeout_ms"); }
 
 
         if !missing_fields.is_empty() {
@@ -99,6 +103,14 @@ impl SettingsApp {
 
     pub fn smart_delay_ms(&self) -> u64 {
         self.smart_delay_ms.expect("Validated")
+    }
+
+    pub fn show_interim(&self) -> bool {
+        self.show_interim.expect("Validated")
+    }
+
+    pub fn stability_timeout_ms(&self) -> u64 {
+        self.stability_timeout_ms.expect("Validated")
     }
 
     pub fn font_size(&self) -> f32 {

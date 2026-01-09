@@ -14,6 +14,9 @@ pub struct TranscriptionState {
     event_queue: VecDeque<(Instant, SonioxTranscriptionResponse)>,
     smart_delay_ms: u64,
     last_final_ms: f64,
+    show_interim: bool,
+    stability_timeout: Duration,
+    last_interim_update: Instant,
 }
 
 impl TranscriptionState {
@@ -31,6 +34,9 @@ impl TranscriptionState {
             event_queue: VecDeque::new(),
             smart_delay_ms: 0,
             last_final_ms: 0.0,
+            show_interim: true,
+            stability_timeout: Duration::from_millis(1000),
+            last_interim_update: Instant::now(),
         }
     }
 
@@ -47,8 +53,13 @@ impl TranscriptionState {
 
     pub fn iter(&self) -> impl Iterator<Item = &AudioSubtitle> {
         // Return in chronological order: [oldest_final, ..., newest_final, interim]
+        let interim_iter = if self.show_interim {
+            Some(&self.interim_line).into_iter()
+        } else {
+            None.into_iter()
+        };
         self.finishes_lines.iter().rev()
-            .chain(std::iter::once(&self.interim_line))
+            .chain(interim_iter)
     }
 
     pub fn set_max_chars(&mut self, max_chars: usize) {
@@ -61,6 +72,11 @@ impl TranscriptionState {
 
     pub fn set_smart_delay(&mut self, delay_ms: u64) {
         self.smart_delay_ms = delay_ms;
+    }
+
+    pub fn set_stability_params(&mut self, show_interim: bool, timeout_ms: u64) {
+        self.show_interim = show_interim;
+        self.stability_timeout = Duration::from_millis(timeout_ms);
     }
 
     pub fn get_active_char_count(&self) -> usize {
@@ -106,6 +122,18 @@ impl TranscriptionState {
 
     pub fn update_animation(&mut self) -> bool {
         self.process_pending_events();
+
+        // Check for stability timeout
+        if !self.interim_line.text.is_empty() && self.last_interim_update.elapsed() >= self.stability_timeout {
+            let text = std::mem::take(&mut self.interim_line.text);
+            let speaker = self.interim_line.speaker.clone();
+            self.log_debug(format!("STABILITY: Freezing after timeout: '{}'", text.trim()));
+            self.push_final(speaker, text, true);
+            self.interim_line.displayed_text.clear();
+            self.frozen_blocks_count = 0;
+            self.frozen_interim_history.clear();
+        }
+
         let mut request_repaint = self.interim_line.update_animation();
         for line in &mut self.finishes_lines {
             if line.update_animation() {
@@ -218,6 +246,9 @@ impl TranscriptionState {
         }
         
         // Final update to interim line
+        if self.interim_line.text != next_interim_text {
+            self.last_interim_update = Instant::now();
+        }
         self.update_interim(interim_speaker, next_interim_text);
     }
 
