@@ -128,10 +128,10 @@ impl TranscriptionState {
             let text = std::mem::take(&mut self.interim_line.text);
             let speaker = self.interim_line.speaker.clone();
             self.log_debug(format!("STABILITY: Freezing after timeout: '{}'", text.trim()));
-            self.push_final(speaker, text, true);
+            self.frozen_interim_history.push_str(&text);
+            let added = self.push_final(speaker, text, true);
             self.interim_line.displayed_text.clear();
-            self.frozen_blocks_count = 0;
-            self.frozen_interim_history.clear();
+            self.frozen_blocks_count += added;
         }
 
         let mut request_repaint = self.interim_line.update_animation();
