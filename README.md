@@ -14,7 +14,7 @@ Unlike standard windows, SoniLiveText renders text directly onto the screen back
 *   **"Ghost" Overlay**: Subtitles are drawn on a click-through, transparent layer. It floats above other windows (or at the bottom) without stealing focus or blocking mouse interactions.
 *   **High-Accuracy AI Transcription**: Leverages the Soniox API for state-of-the-art speech recognition.
 *   **Live Translation**: Instantly translate spoken text into your target language.
-*   **Typewriter Animation**: Experience smooth, comfortable reading with a typewriter-style text appearance effect that reduces eye strain compared to sudden text blocks.
+*   **Stable Typewriter Animation**: Advanced stabilization logic ensures text flows smoothly, sentence by sentence, without jumping or flickering. "Wait-and-stream" technology prevents eye strain.
 *   **Speaker Identification**: Distinguishes between different speakers in a conversation.
 *   **Resilient Connectivity**: Automatically reconnects if the server connection drops.
 *   **Highly Configurable**: Customize window position, size, colors, fonts, and behavior via a simple configuration file.
@@ -70,6 +70,8 @@ The application is entirely controlled via the `config.toml` file.
 | `window_height` | Float | Height of the subtitle area in pixels. |
 | `audio_input` | String | Source: `"loopback"` (system audio) or `"microphone"`. |
 | `font_size` | Float | Font size for the text (e.g. `24.0`). |
+| `show_interim` | Boolean | If `true`, shows unstable interim text (grayed out) before finalizing. |
+| `stability_timeout_ms` | Integer | Latency buffer in ms. Higher values = more stability, lower = faster display. Default ~2000ms. |
 
 ##  CREDITS & ACKNOWLEDGEMENTS
 
