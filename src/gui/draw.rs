@@ -7,7 +7,7 @@ pub(crate) fn draw_text_with_shadow<'a>(
     lines: impl Iterator<Item = &'a AudioSubtitle>,
     font_size: f32,
     text_color: Color32,
-    interim_visual_height: f32,
+    _interim_visual_height: f32,
 ) -> f32 {
     let font = FontId::proportional(font_size);
     let painter = ui.painter();
@@ -81,13 +81,17 @@ pub(crate) fn draw_text_with_shadow<'a>(
         // Draw main text
         painter.galley(pos, galley, text_color);
 
+        // Check if this line ends a sentence to add extra spacing (double line break)
+        let ends_sentence = line.text.trim_end().ends_with(|c| c == '.' || c == '?' || c == '!');
+
         // Move up for the next line, adding some spacing
-        // Use smoothed height for the first item (interim), real height for others
-        let spacing_height = if index == 0 {
-             interim_visual_height
-        } else {
-             galley_height
-        };
+        // Word-like Wrapping: Use real height for everything to allow instant jumps.
+        let mut spacing_height = galley_height;
+        
+        if ends_sentence {
+            // Add a "double line break" effect by increasing the gap
+            spacing_height += font_size * 0.8; 
+        }
 
         current_y -= spacing_height + (font_size * 0.2);
         
@@ -97,5 +101,8 @@ pub(crate) fn draw_text_with_shadow<'a>(
         }
     }
     
+    // The animation height now represents the "growth" of the newest line.
+    // When a line is committed, it's no longer 'interim', so it shouldn't be affected by interim_visual_height.
+    // To make it look like Word, the total height should transition smoothly.
     first_item_height
 }

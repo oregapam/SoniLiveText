@@ -89,7 +89,7 @@ impl App for SubtitlesApp {
         let usable_width = main_rect.width() * 0.88;
         let avg_char_width = self.font_size * 0.46;
         let chars_per_line = usable_width / avg_char_width;
-        let max_chars = ((chars_per_line * 0.95) as usize).max(50);
+        let max_chars = (chars_per_line as usize).max(50);
         self.subtitles_state.set_max_chars(max_chars);
 
         // Separate Native Debug Window

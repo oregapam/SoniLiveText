@@ -240,10 +240,8 @@ impl TranscriptionState {
              let effective_interim = full_interim_text[self.frozen_interim_history.len()..].to_string();
 
              let limit = self.max_chars_in_block;
-            // Increased safety buffer to prevent premature freezing of sentences.
-            // If it fits within limit + 25 chars, we let it flow to push_final 
-            // where we have "orphan guard" logic.
-            let safety_buffer = 25; 
+            // Word-like Wrapping: Remove safety buffer to jump exactly at limit.
+            let safety_buffer = 0; 
             
             // PRIORITY 1: Freeze at Sentence End (if available and fits)
             // Look for [.?!] followed by whitespace (or end? No, need stability)
@@ -322,12 +320,8 @@ impl TranscriptionState {
              if text.is_empty() { break; }
 
              let (chunk, remainder) = if text.len() > self.max_chars_in_block {
-                 // ORPHAN GUARD:
-                 // If the text is only slightly longer than the limit (e.g. +15 chars),
-                 // and it's a single sentence/phrase, forcing a split creates a small "orphan" line on the next block.
-                 // We prefer to keep it as ONE block and let the UI wrapping handle it effectively.
-                 // This reduces the "stairs" effect.
-                 if text.len() <= self.max_chars_in_block + 15 {
+                 // Word-like Wrapping: Remove orphan guard to respect window width strictly.
+                 if false {
                      (text, None)
                  } else {
                      // Too long, must split
@@ -372,7 +366,7 @@ impl TranscriptionState {
                     
                     // Note: We intentionally IGNORE speaker differences here to keep the flow.
                     
-                    if (last.text.len() + chunk.len()) > self.max_chars_in_block + 15 {
+                    if (last.text.len() + chunk.len()) > self.max_chars_in_block {
                         if is_continuation {
                             // Exceptional case: We are in the middle of a word (e.g. "vis" + "ion").
                             // Do NOT split. Append even if it overflows.
@@ -397,14 +391,28 @@ impl TranscriptionState {
             };
 
             if !should_start_new {
-                let last = self.finishes_lines.front_mut().unwrap();
-                // Smart merge: ensure space separator if needed
-                if !last.text.ends_with(char::is_whitespace) && !chunk.starts_with(char::is_whitespace) {
-                    last.text.push(' ');
+                let is_dedupe = {
+                    let last = self.finishes_lines.front().unwrap();
+                    let chunk_trimmed = chunk.trim();
+                    let last_trimmed = last.text.trim_end();
+                    !chunk_trimmed.is_empty() && last_trimmed.ends_with(chunk_trimmed)
+                };
+
+                if is_dedupe {
+                    self.log_debug(format!("DEDUPE: Ignored redundant chunk '{}'", chunk.trim()));
+                } else {
+                    let last = self.finishes_lines.front_mut().unwrap();
+                    // Smart merge: ensure space separator if needed
+                    if !last.text.ends_with(char::is_whitespace) && !chunk.starts_with(char::is_whitespace) {
+                        last.text.push(' ');
+                    }
+                    last.text.push_str(&chunk);
                 }
-                last.text.push_str(&chunk);
+
                 if instant {
-                    last.displayed_text = last.text.clone();
+                    if let Some(last) = self.finishes_lines.front_mut() {
+                        last.displayed_text = last.text.clone();
+                    }
                 }
             } else {
                  let mut sub = AudioSubtitle::new(speaker.clone(), chunk);
