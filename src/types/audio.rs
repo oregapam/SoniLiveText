@@ -35,7 +35,7 @@ impl AudioSubtitle {
         }
     }
 
-    pub fn update_animation(&mut self) -> bool {
+    pub fn update_animation(&mut self, ignore_timer: bool) -> bool {
         if self.displayed_text.len() >= self.text.len() {
             // handle deletion/correction
              if self.displayed_text.len() > self.text.len() {
@@ -46,7 +46,7 @@ impl AudioSubtitle {
         }
 
         // Speed: 20ms per char
-        if self.last_update.elapsed() > Duration::from_millis(20) {
+        if ignore_timer || self.last_update.elapsed() > Duration::from_millis(20) {
             let next_char_index = self.displayed_text.chars().count();
             if let Some(c) = self.text.chars().nth(next_char_index) {
                 self.displayed_text.push(c);

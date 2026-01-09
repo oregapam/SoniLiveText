@@ -134,12 +134,46 @@ impl TranscriptionState {
             self.frozen_blocks_count += added;
         }
 
-        let mut request_repaint = self.interim_line.update_animation();
-        for line in &mut self.finishes_lines {
-            if line.update_animation() {
+        let mut request_repaint = false;
+        let mut animation_blocked = false;
+        
+        // How many lines are waiting to be typed?
+        let mut waiting_count = 0;
+        for line in &self.finishes_lines {
+            if line.displayed_text.len() < line.text.len() {
+                waiting_count += 1;
+            }
+        }
+        if self.interim_line.displayed_text.len() < self.interim_line.text.len() {
+            waiting_count += 1;
+        }
+
+        // Animate final blocks in chronological order (oldest first)
+        for line in self.finishes_lines.iter_mut().rev() {
+            if animation_blocked {
+                break;
+            }
+            
+            // If we have a backlog, speed up the typewriter (20ms -> 10ms or less)
+            let speed_boost = if waiting_count > 1 { (waiting_count as usize).min(4) } else { 1 };
+            for i in 0..speed_boost {
+                if line.update_animation(i > 0) {
+                    request_repaint = true;
+                }
+            }
+
+            if line.displayed_text.len() < line.text.len() {
+                animation_blocked = true;
+            }
+        }
+
+        // Only animate interim if all final lines are finished
+        if !animation_blocked {
+            if self.interim_line.update_animation(false) {
                 request_repaint = true;
             }
         }
+
         request_repaint
     }
 
