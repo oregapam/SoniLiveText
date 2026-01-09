@@ -187,20 +187,47 @@ impl TranscriptionState {
         let mut max_ms = self.last_final_ms;
 
         for token in response.tokens {
-            if token.translation_status.as_deref() == Some("original") {
-                continue;
-            } else if token.is_final {
-                let end_ms = token.end_ms.unwrap_or(0.0);
-                if end_ms <= self.last_final_ms {
-                    continue;
+            let is_original = token.translation_status.as_deref() == Some("original");
+            let is_translation = token.translation_status.as_deref() == Some("translation");
+            
+            // Timing update: track the furthest point finalized by the AI
+            if is_original && token.is_final {
+                if let Some(end_ms) = token.end_ms {
+                    if end_ms > max_ms {
+                        max_ms = end_ms;
+                    }
                 }
-                final_speaker = token.speaker.clone();
-                final_text_segment.push_str(&token.text);
-                has_final = true;
-                if end_ms > max_ms {
-                    max_ms = end_ms;
+            }
+
+            if token.is_final {
+                // Deduplicate based on end_ms if available.
+                // Note: Translation tokens often lack end_ms, but they are typically 
+                // sent once per finalized segment.
+                if let Some(end_ms) = token.end_ms {
+                    if end_ms <= self.last_final_ms {
+                        continue;
+                    }
+                }
+
+                // If we are in translation mode, we only want to display "translation" tokens.
+                // If translation mode is OFF, we want everything (which will have no status or "original").
+                let show_this_token = if is_original {
+                    // Only show original final tokens if we AREN'T expecting translations
+                    // (Actually, if we see ANY translation token in the stream, we should probably stick to them)
+                    false 
+                } else {
+                    // This is either a translated token or a normal one (no translate mode)
+                    true
+                };
+
+                if show_this_token {
+                    final_speaker = token.speaker.clone();
+                    final_text_segment.push_str(&token.text);
+                    has_final = true;
                 }
             } else {
+                // INTERIM processing.
+                // We show original interim text as feedback until the translation arrives.
                 if interim_speaker != token.speaker {
                     interim_speaker = token.speaker.clone();
                 }
