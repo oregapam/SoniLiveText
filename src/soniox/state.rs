@@ -129,7 +129,7 @@ impl TranscriptionState {
             let speaker = self.interim_line.speaker.clone();
             self.log_debug(format!("STABILITY: Freezing after timeout: '{}'", text.trim()));
             self.frozen_interim_history.push_str(&text);
-            let added = self.push_final(speaker, text, true);
+            let added = self.push_final(speaker, text, false);
             self.interim_line.displayed_text.clear();
             self.frozen_blocks_count += added;
         }
@@ -180,7 +180,7 @@ impl TranscriptionState {
             if final_text_segment.starts_with(&self.frozen_interim_history) {
                  let text_to_push = final_text_segment[self.frozen_interim_history.len()..].to_string();
                  self.log_debug(format!("FINAL: Pushing suffix '{}'", text_to_push.trim()));
-                 self.push_final(final_speaker.clone(), text_to_push, true);
+                 self.push_final(final_speaker.clone(), text_to_push, false);
                  self.frozen_blocks_count = 0;
                  self.frozen_interim_history.clear();
             } else if self.frozen_interim_history.starts_with(&final_text_segment) {
@@ -191,7 +191,7 @@ impl TranscriptionState {
                 for _ in 0..self.frozen_blocks_count {
                     self.finishes_lines.pop_front();
                 }
-                self.push_final(final_speaker.clone(), final_text_segment, true);
+                self.push_final(final_speaker.clone(), final_text_segment, false);
                 self.frozen_blocks_count = 0;
                 self.frozen_interim_history.clear();
             }
@@ -220,7 +220,7 @@ impl TranscriptionState {
                 let frozen_chunk_str = frozen_chunk.to_string();
                 self.log_debug(format!("FREEZE (Sentence): '{}'", frozen_chunk_str.trim()));
                 self.frozen_interim_history.push_str(&frozen_chunk_str);
-                let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, true);
+                let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, false);
                 self.frozen_blocks_count += added;
                 next_interim_text = remainder.to_string();
              } else if effective_interim.len() > split_limit + 50 { // Even more slack
@@ -234,7 +234,7 @@ impl TranscriptionState {
                     let frozen_chunk_str = frozen_chunk.to_string();
                     self.log_debug(format!("FREEZE (Size): '{}'", frozen_chunk_str.trim()));
                     self.frozen_interim_history.push_str(&frozen_chunk_str);
-                    let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, true);
+                    let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, false);
                     self.frozen_blocks_count += added;
                     next_interim_text = remainder.to_string();
                 } else {
