@@ -4,8 +4,8 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 pub struct TranscriptionState {
-    finishes_lines: VecDeque<AudioSubtitle>,
-    interim_line: AudioSubtitle,
+    pub finishes_lines: VecDeque<AudioSubtitle>,
+    pub interim_line: AudioSubtitle,
     max_lines: usize,
     max_chars_in_block: usize,
     frozen_interim_history: String,
@@ -13,6 +13,7 @@ pub struct TranscriptionState {
     pub debug_log: VecDeque<String>,
     event_queue: VecDeque<(Instant, SonioxTranscriptionResponse)>,
     smart_delay_ms: u64,
+    last_final_ms: f64,
 }
 
 impl TranscriptionState {
@@ -20,7 +21,7 @@ impl TranscriptionState {
         assert!(max_lines > 0);
 
         Self {
-            finishes_lines: VecDeque::with_capacity(max_lines - 1),
+            finishes_lines: VecDeque::with_capacity(max_lines),
             interim_line: AudioSubtitle::default(),
             max_lines,
             max_chars_in_block,
@@ -29,10 +30,11 @@ impl TranscriptionState {
             debug_log: VecDeque::with_capacity(20),
             event_queue: VecDeque::new(),
             smart_delay_ms: 0,
+            last_final_ms: 0.0,
         }
     }
 
-    fn log_debug(&mut self, msg: String) {
+    pub fn log_debug(&mut self, msg: String) {
         if self.debug_log.len() >= 20 {
             self.debug_log.pop_front();
         }
@@ -44,7 +46,29 @@ impl TranscriptionState {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &AudioSubtitle> {
-        std::iter::once(&self.interim_line).chain(&self.finishes_lines)
+        // Return in chronological order: [oldest_final, ..., newest_final, interim]
+        self.finishes_lines.iter().rev()
+            .chain(std::iter::once(&self.interim_line))
+    }
+
+    pub fn set_max_chars(&mut self, max_chars: usize) {
+        self.max_chars_in_block = max_chars;
+    }
+
+    pub fn get_max_chars(&self) -> usize {
+        self.max_chars_in_block
+    }
+
+    pub fn set_smart_delay(&mut self, delay_ms: u64) {
+        self.smart_delay_ms = delay_ms;
+    }
+
+    pub fn get_active_char_count(&self) -> usize {
+        self.finishes_lines.front().map(|l| l.text.len()).unwrap_or(0)
+    }
+
+    pub fn get_frozen_block_count(&self) -> usize {
+        self.finishes_lines.len()
     }
 
     pub fn process_pending_events(&mut self) {
@@ -61,18 +85,29 @@ impl TranscriptionState {
         }
     }
 
-    pub fn update_animation(&mut self) -> bool {
-        // Process buffered events first
-        self.process_pending_events();
-
-        let mut request_repaint = false;
-        if self.interim_line.update_animation() {
-            request_repaint = true;
+    pub fn handle_transcription(&mut self, response: SonioxTranscriptionResponse) {
+        let is_purely_interim = !response.tokens.iter().any(|t| t.is_final);
+        
+        if is_purely_interim {
+            if let Some((_, last_response)) = self.event_queue.back_mut() {
+                let last_is_purely_interim = !last_response.tokens.iter().any(|t| t.is_final);
+                if last_is_purely_interim {
+                    let new_speaker = response.tokens.first().map(|t| &t.speaker);
+                    let last_speaker = last_response.tokens.first().map(|t| &t.speaker);
+                    if new_speaker == last_speaker {
+                        *last_response = response;
+                        return;
+                    }
+                }
+            }
         }
+        self.event_queue.push_back((Instant::now(), response));
+    }
+
+    pub fn update_animation(&mut self) -> bool {
+        self.process_pending_events();
+        let mut request_repaint = self.interim_line.update_animation();
         for line in &mut self.finishes_lines {
-            // Only animate newest line if needed, or all lines?
-            // Usually only the newest inserted line needs animation, but
-            // let's just update all to be safe.
             if line.update_animation() {
                 request_repaint = true;
             }
@@ -80,155 +115,67 @@ impl TranscriptionState {
         request_repaint
     }
 
-    pub fn get_active_char_count(&self) -> usize {
-        // Active line is at the front of finishes_lines usually (the one being appended to)
-        // OR if interim is separate?
-        // Logic in push_final appends to finishes_lines.front().
-        // So the "active growing block" is finishes_lines.front().
-        self.finishes_lines.front().map(|l| l.text.len()).unwrap_or(0)
-    }
-
-    pub fn get_frozen_block_count(&self) -> usize {
-        self.finishes_lines.len()
-    }
-
-    pub fn get_max_chars(&self) -> usize {
-        self.max_chars_in_block
-    }
-
-    pub fn set_max_chars(&mut self, max_chars: usize) {
-        self.max_chars_in_block = max_chars;
-    }
-
-    pub fn set_smart_delay(&mut self, delay_ms: u64) {
-        self.smart_delay_ms = delay_ms;
-    }
-
-    pub fn handle_transcription(&mut self, response: SonioxTranscriptionResponse) {
-        // Smart Buffering & Collapsing Logic
-        // If the NEW response is purely Interim (no final parts), check if the last queued item is also purely Interim.
-        // If so, and speaker matches, we can REPLACE the old one with the new one.
-        // This effectively "collapses" the jittery intermediate updates.
-        
-        let is_purely_interim = !response.tokens.iter().any(|t| t.is_final);
-        
-        if is_purely_interim {
-            if let Some((_, last_response)) = self.event_queue.back_mut() {
-                let last_is_purely_interim = !last_response.tokens.iter().any(|t| t.is_final);
-                if last_is_purely_interim {
-                    // Check speaker match (heuristic: check first token speaker)
-                    let new_speaker = response.tokens.first().map(|t| &t.speaker);
-                    let last_speaker = last_response.tokens.first().map(|t| &t.speaker);
-                    
-                    if new_speaker == last_speaker {
-                        // COLLAPSE: Update the text content, keep the timestamp? 
-                        // If we keep timestamp, we process it sooner (good for latency).
-                        // If we update timestamp, we delay it more (good for stability).
-                        // Decision: Update timestamp to ensure the *new* text gets its full delay time to settle.
-                        *last_response = response;
-                        // Actually, we should probably update the timestamp to `now` if we want "stability delay".
-                        // If we keep old timestamp, it might process immediately if old one was about to expire.
-                        // Let's UPDATE timestamp to `Instant::now()` so the new text has to prove its stability.
-                        // Wait, if we keep resetting timestamp, a constantly changing interim will NEVER appear?
-                        // That's bad. The user wants to see it eventually.
-                        // Better: Keep the ORIGINAL timestamp. The "slot" is due to be displayed. We just show the latest info in that slot.
-                        // This minimizes latency.
-                        // NO OP on timestamp.
-                        return;
-                    }
-                }
-            }
-        }
-
-        self.event_queue.push_back((Instant::now(), response));
-    }
-
     fn process_transcription_event(&mut self, response: SonioxTranscriptionResponse) {
         let mut full_interim_text = String::new();
         let mut interim_speaker = Option::<String>::None;
-        
         let mut final_text_segment = String::new();
         let mut final_speaker = Option::<String>::None;
         let mut has_final = false;
+
+        let mut max_ms = self.last_final_ms;
 
         for token in response.tokens {
             if token.translation_status.as_deref() == Some("original") {
                 continue;
             } else if token.is_final {
-                // Final token logic
-                if final_speaker != token.speaker {
-                     // Flush previous final if exists? 
-                     // Typically Soniox sends one final block or sequence.
-                     // Simplification: handle immediately
+                let end_ms = token.end_ms.unwrap_or(0.0);
+                if end_ms <= self.last_final_ms {
+                    continue;
                 }
                 final_speaker = token.speaker.clone();
                 final_text_segment.push_str(&token.text);
                 has_final = true;
+                if end_ms > max_ms {
+                    max_ms = end_ms;
+                }
             } else {
-                // Interim logic
                 if interim_speaker != token.speaker {
                     interim_speaker = token.speaker.clone();
-                    // Reset if speaker changes mid-stream? 
-                    // Usually implies new sentence.
                 }
                 full_interim_text.push_str(&token.text);
             }
         }
 
+        self.last_final_ms = max_ms;
+
         if has_final {
-            // Deduplicate against frozen history
             if final_text_segment.starts_with(&self.frozen_interim_history) {
-                 // CASE 1: Final is longer or equal to history. 
-                 // We kept the prefix safe, now just push the new suffix.
                  let text_to_push = final_text_segment[self.frozen_interim_history.len()..].to_string();
-                 self.log_debug(format!("FINAL extends history. Pushing suffix: '{}'", text_to_push));
+                 self.log_debug(format!("FINAL: Pushing suffix '{}'", text_to_push.trim()));
                  self.push_final(final_speaker.clone(), text_to_push, true);
-                 // We committed to history. Reset count.
                  self.frozen_blocks_count = 0;
                  self.frozen_interim_history.clear();
-                 
             } else if self.frozen_interim_history.starts_with(&final_text_segment) {
-                 // CASE 2: History is LONGER than Final (Aggressive freeze).
-                 // We already displayed this part. Do NOT push it again.
-                 // Just remove it from history so we expect the *rest* later.
-                 self.log_debug(format!("FINAL covered by history. Consuming prefix: '{}' (Remaining history: {})", 
-                    final_text_segment, 
-                    self.frozen_interim_history.len() - final_text_segment.len()
-                 ));
-                 // Drain the prefix from history
+                 self.log_debug(format!("FINAL: Already covered by history '{}'", final_text_segment.trim()));
                  self.frozen_interim_history.drain(..final_text_segment.len());
-                 // Do not reset count here! We are still "floating" on the remaining history.
-                 
             } else {
-                // CASE 3: Mismatch.
-                // BACKTRACK!
-                self.log_debug(format!("FINAL mismatch. Backtracking {} blocks. History: '{}' -> Final: '{}'", 
-                    self.frozen_blocks_count, self.frozen_interim_history, final_text_segment));
-                
-                // Pop the unreliable ghost blocks
+                self.log_debug(format!("BACKTRACK: {} ghosts because of '{}'", self.frozen_blocks_count, final_text_segment.trim()));
                 for _ in 0..self.frozen_blocks_count {
                     self.finishes_lines.pop_front();
                 }
-                
-                // Push correct text
                 self.push_final(final_speaker.clone(), final_text_segment, true);
-                
-                // Reset
                 self.frozen_blocks_count = 0;
                 self.frozen_interim_history.clear();
             }
-            
-            // Also clear interim line because we have a final (or consumed it)
-            self.update_interim(interim_speaker.clone(), String::new());
+            // CRITICAL: Don't call update_interim("") here if we are about to call it with text below.
+            // That's what causes the "spin". We'll update it at the very end of this function.
         }
 
+        let mut next_interim_text = String::new();
+
         if !full_interim_text.is_empty() {
-             // Check if interim matches our frozen history
              if !full_interim_text.starts_with(&self.frozen_interim_history) {
-                 self.log_debug(format!("Interim mismatch! Resetting {} ghosts. H: '{}' N: '{}'", 
-                    self.frozen_blocks_count, self.frozen_interim_history, full_interim_text));
-                 
-                 // Retroactively fix the drift
+                 self.log_debug("Interim drift! Resetting ghosts.".to_string());
                  for _ in 0..self.frozen_blocks_count {
                      self.finishes_lines.pop_front();
                  }
@@ -236,230 +183,152 @@ impl TranscriptionState {
                  self.frozen_interim_history.clear();
              }
 
-             // Now we are synced (history is empty or a valid prefix)
              let effective_interim = full_interim_text[self.frozen_interim_history.len()..].to_string();
+             // Dynamic limit for splitting is higher than the wrapping limit to allow natural flow.
+             let split_limit = self.max_chars_in_block.max(100); 
 
-             let limit = self.max_chars_in_block;
-            // Word-like Wrapping: Remove safety buffer to jump exactly at limit.
-            let safety_buffer = 0; 
-            
-            // PRIORITY 1: Freeze at Sentence End (if available and fits)
-            // Look for [.?!] followed by whitespace (or end? No, need stability)
-            let sentence_split_idx = effective_interim.char_indices()
-                .zip(effective_interim.chars().skip(1)) // ( (i, c), next_c )
-                .filter(|((i, c), next_c)| {
-                     *i < limit && 
-                     (*c == '.' || *c == '?' || *c == '!') && 
-                     next_c.is_whitespace()
-                })
-                .map(|((i, _), _)| i + 1) // Include the punctuation
-                .next(); // Take the FIRST one to prioritize "One sentence per line"
-
-            if let Some(idx) = sentence_split_idx {
+             if let Some(idx) = find_sentence_split(&effective_interim, split_limit) {
                 let (frozen_chunk, remainder) = effective_interim.split_at(idx);
                 let frozen_chunk_str = frozen_chunk.to_string();
-                
-                self.log_debug(format!("FREEZE (Sentence): '{}'", frozen_chunk_str));
-
+                self.log_debug(format!("FREEZE (Sentence): '{}'", frozen_chunk_str.trim()));
                 self.frozen_interim_history.push_str(&frozen_chunk_str);
-                
                 let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, true);
                 self.frozen_blocks_count += added;
-                
-                // UN-HIDE: Show interim tail for real-time feedback
-                self.update_interim(interim_speaker, remainder.to_string());
-                // self.update_interim(interim_speaker, String::new());
-                
-            } else if effective_interim.len() > limit + safety_buffer {
-                // PRIORITY 2: Freeze at Limit (Overflow preventer)
+                next_interim_text = remainder.to_string();
+             } else if effective_interim.len() > split_limit + 50 { // Even more slack
                 let split_idx = effective_interim.char_indices()
-                    .filter(|(i, c)| *i >= limit && c.is_whitespace())
+                    .filter(|(i, c)| *i >= split_limit && c.is_whitespace())
                     .map(|(i, _)| i)
                     .next();
 
                 if let Some(idx) = split_idx {
                     let (frozen_chunk, remainder) = effective_interim.split_at(idx);
                     let frozen_chunk_str = frozen_chunk.to_string();
-                    
-                    self.log_debug(format!("FREEZE (Overflow): '{}' (len: {})", frozen_chunk_str, frozen_chunk_str.len()));
-
+                    self.log_debug(format!("FREEZE (Size): '{}'", frozen_chunk_str.trim()));
                     self.frozen_interim_history.push_str(&frozen_chunk_str);
-                    
                     let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, true);
                     self.frozen_blocks_count += added;
-                    
-                    // UN-HIDE: Show interim tail for real-time feedback
-                    self.update_interim(interim_speaker, remainder.to_string());
-                    // self.update_interim(interim_speaker, String::new());
+                    next_interim_text = remainder.to_string();
                 } else {
-                     // UN-HIDE: Show interim
-                     self.update_interim(interim_speaker, effective_interim);
-                     // self.update_interim(interim_speaker, String::new());
+                     next_interim_text = effective_interim;
                 }
-            } else {
-                // UN-HIDE: Show interim
-                self.update_interim(interim_speaker, effective_interim);
-                // self.update_interim(interim_speaker, String::new());
-            }
-        } else if has_final {
-        } else {
-            self.update_interim(interim_speaker, String::new());
+             } else {
+                next_interim_text = effective_interim;
+             }
         }
+        
+        // Final update to interim line
+        self.update_interim(interim_speaker, next_interim_text);
     }
 
-    // Returns number of NEW blocks created
     fn push_final(&mut self, speaker: Option<String>, mut text: String, instant: bool) -> usize {
-        if text.is_empty() {
-            return 0;
-        }
+        if text.is_empty() { return 0; }
+        let mut added = 0;
 
-        let mut blocks_added = 0;
-
-        // Recursive / Iterative splitting for massive text
         loop {
-             if text.is_empty() { break; }
-
-             let (chunk, remainder) = if text.len() > self.max_chars_in_block {
-                 // Word-like Wrapping: Remove orphan guard to respect window width strictly.
-                 if false {
-                     (text, None)
-                 } else {
-                     // Too long, must split
-                     let limit = self.max_chars_in_block;
-                     let split_idx = text.char_indices()
-                        .filter(|(i, c)| *i <= limit && c.is_whitespace())
-                        .map(|(i, _)| i)
-                        .last()
-                        .or_else(|| {
-                            text.char_indices()
-                                .filter(|(i, c)| *i > limit && *i < limit + 10 && c.is_whitespace())
-                                .map(|(i, _)| i)
-                                .next()
-                        })
-                        .unwrap_or(limit.min(text.len()));
-                     
-                     let (c, r) = text.split_at(split_idx);
-                     (c.to_string(), Some(r.to_string()))
-                 }
-             } else {
-                 (text, None)
-             };
-             
-             // Check if we should start a new block
-             let should_start_new = match self.finishes_lines.front() {
-                Some(last) => {
-                    // Start new if:
-                    // 1. Speaker changed
-                    // 2. Length would exceed limit (UNLESS mid-word)
-                    // 3. Last block ended with sentence punctuation (.?!) -> FORCE NEW LINE
-                    let ends_sentence = last.text.trim_end().ends_with(|c| c == '.' || c == '?' || c == '!');
-                    let is_continuation = !last.text.is_empty() 
-                        && !last.text.ends_with(char::is_whitespace) 
-                        && !chunk.starts_with(char::is_whitespace);
-                    
-                    // Loose speaker matching logic removed as we now ignore speaker changes entirely.
-
-                    // USER REQUEST: Ignore speaker changes.
-                    // Only start new block if:
-                    // 1. Line overflow (checked below)
-                    // 2. Previous block ended with sentence punctuation (.?!)
-                    
-                    // Note: We intentionally IGNORE speaker differences here to keep the flow.
-                    
-                    if (last.text.len() + chunk.len()) > self.max_chars_in_block {
-                        if is_continuation {
-                            // Exceptional case: We are in the middle of a word (e.g. "vis" + "ion").
-                            // Do NOT split. Append even if it overflows.
-                            let last_word = last.text.split_whitespace().last().unwrap_or("<empty>");
-                            self.log_debug(format!("Overflow ignored (Mid-word): '{}' + '{}'", last_word, chunk));
-                            false
-                        } else {
-                             let last_word = last.text.split_whitespace().last().unwrap_or("<empty>");
-                             self.log_debug(format!("New Block: Overflow. {} + {} > {}. Last: '{}'", 
-                                last.text.len(), chunk.len(), self.max_chars_in_block, last_word));
-                            true
-                        }
-                    } else if ends_sentence {
-                        self.log_debug("New Block: Sentence ends previous line.".to_string());
-                        true
-                    } else {
-                        // Merge!
-                        false
-                    }
-                }
-                None => true,
+            if text.is_empty() { break; }
+            
+            // 1. Determine local chunk (Split ONLY if it contains an internal sentence ending)
+            // Character-based splitting is disabled for "Word-like" flow.
+            let (chunk, remainder) = if let Some(idx) = find_sentence_split(&text, 9999) {
+                let (c, r) = text.split_at(idx);
+                (c.to_string(), Some(r.to_string()))
+            } else {
+                (text.clone(), None)
             };
 
-            if !should_start_new {
-                let is_dedupe = {
-                    let last = self.finishes_lines.front().unwrap();
-                    let chunk_trimmed = chunk.trim();
+            // 2. Decide if we start a new block or merge
+            let (should_start_new, reason) = match self.finishes_lines.front() {
+                Some(last) => {
                     let last_trimmed = last.text.trim_end();
-                    !chunk_trimmed.is_empty() && last_trimmed.ends_with(chunk_trimmed)
-                };
-
-                if is_dedupe {
-                    self.log_debug(format!("DEDUPE: Ignored redundant chunk '{}'", chunk.trim()));
-                } else {
-                    let last = self.finishes_lines.front_mut().unwrap();
-                    // Smart merge: ensure space separator if needed
-                    if !last.text.ends_with(char::is_whitespace) && !chunk.starts_with(char::is_whitespace) {
-                        last.text.push(' ');
+                    let ends_sentence = last_trimmed.ends_with(|c| c == '.' || c == '?' || c == '!');
+                    
+                    // Fallback to prevent infinite block growth if there's no punctuation
+                    let too_long = last.text.len() > 200; 
+                    let is_mid_word = !last.text.ends_with(char::is_whitespace) && !chunk.starts_with(char::is_whitespace);
+                    
+                    if ends_sentence {
+                        (true, "End of sentence")
+                    } else if too_long && !is_mid_word {
+                        (true, "Safety overflow")
+                    } else {
+                        (false, "")
                     }
+                }
+                None => (true, "Initial"),
+            };
+
+            if should_start_new {
+                // self.log_debug(format!("BLOCK: New ({})", reason));
+                let mut sub = AudioSubtitle::new(speaker.clone(), chunk);
+                if instant { sub.displayed_text = sub.text.clone(); }
+                self.finishes_lines.push_front(sub);
+                added += 1;
+            } else {
+                // Merge logic
+                let last = self.finishes_lines.front_mut().unwrap();
+                let last_ends_with_space = last.text.ends_with(char::is_whitespace);
+                let chunk_starts_with_space = chunk.starts_with(char::is_whitespace);
+                
+                if !last_ends_with_space && chunk_starts_with_space && chunk.trim_start().len() <= 2 {
+                    // Hungarian fragment fix (milli + ó)
+                    last.text.push_str(chunk.trim_start());
+                } else {
                     last.text.push_str(&chunk);
                 }
-
-                if instant {
-                    if let Some(last) = self.finishes_lines.front_mut() {
-                        last.displayed_text = last.text.clone();
-                    }
-                }
-            } else {
-                 let mut sub = AudioSubtitle::new(speaker.clone(), chunk);
-                 if instant {
-                     sub.displayed_text = sub.text.clone();
-                 }
-                 self.finishes_lines.push_front(sub);
-                 blocks_added += 1;
+                if instant { last.displayed_text = last.text.clone(); }
             }
 
-            if self.finishes_lines.len() > self.max_lines - 1 {
+            if self.finishes_lines.len() >= self.max_lines {
                 self.finishes_lines.pop_back();
             }
-            
+
             if let Some(r) = remainder {
                 text = r;
             } else {
                 break;
             }
         }
-        
-        blocks_added
+        added
     }
 
     fn update_interim(&mut self, speaker: Option<String>, text: String) {
-        // If the new interim text is DIFFERENT from the old one, we should reset animation?
-        // Or just update target.
-        // For interim, usually it updates rapidly. Animation might just lag behind.
+        // If the text is the same, do nothing.
+        if self.interim_line.text == text && self.interim_line.speaker == speaker {
+            return;
+        }
+
+        self.interim_line.speaker = speaker;
+        let old_text = std::mem::replace(&mut self.interim_line.text, text);
         
-        match self.finishes_lines.front_mut() {
-            Some(last) if last.speaker == speaker => {
-                 self.interim_line = AudioSubtitle::new_complete(None, text);
+        // Anti-spin / Typewriter preservation:
+        // If the new text is just an expansion of the old text, 
+        // DO NOT reset displayed_text.
+        if self.interim_line.text.starts_with(&old_text) {
+             // Good! Typewriter will just continue.
+        } else {
+            // It's a revision or a new phrase.
+            // If the current displayed text is NOT a prefix of the new text, 
+            // then we MUST reset the typewriter.
+            if !self.interim_line.text.starts_with(&self.interim_line.displayed_text) {
+                // self.log_debug("REVISION: Resetting typewriter".to_string());
+                self.interim_line.displayed_text = String::new();
             }
-            _ => {
-                // For interim, usually we want to see it immediately if it updates fast.
-                // But for translation, it might jump.
-                // Let's use animation for interim too.
-                
-                // If text is completely different, maybe we should reset displayed_text?
-                // But typically Soniox appends.
-                
-                 self.interim_line.speaker = speaker;
-                 self.interim_line.text = text;
-            },
+        }
+        
+        // Immediate completion if it's identical or backwards (safety)
+        if self.interim_line.displayed_text.len() > self.interim_line.text.len() {
+             self.interim_line.displayed_text = self.interim_line.text.clone();
         }
     }
 }
 
-
-
+fn find_sentence_split(text: &str, limit: usize) -> Option<usize> {
+    text.char_indices()
+        .zip(text.chars().skip(1))
+        .filter(|((i, c), next_c)| {
+            *i < limit && (*c == '.' || *c == '?' || *c == '!') && next_c.is_whitespace()
+        })
+        .map(|((i, _), _)| i + 1)
+        .next()
+}

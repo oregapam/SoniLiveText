@@ -9,6 +9,8 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_tungstenite::connect_async;
 use tungstenite::client::IntoClientRequest;
 use tungstenite::{Bytes, Message, Utf8Bytes};
+use std::fs::OpenOptions;
+use std::io::Write;
 
 async fn listen_soniox_stream(
     bytes: Vec<u8>,
@@ -27,6 +29,15 @@ async fn listen_soniox_stream(
         let reader = async move {
             while let Some(msg) = read.next().await {
                 if let Message::Text(txt) = msg? {
+                    // Log raw raw data to file
+                    if let Ok(mut file) = OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open("raw_data.log") 
+                    {
+                        let _ = writeln!(file, "{}", txt);
+                    }
+
                     let response: SonioxTranscriptionResponse = serde_json::from_str(&txt)?;
                     let _ = tx_subs.send(response);
                 }

@@ -1,0 +1,60 @@
+    Checking sonilivetext v0.1.0 (C:\Users\mark\Documents\Projektek\HUN-REN\Soniox\SoniLiveText)
+error[E0308]: mismatched types
+   --> src\soniox\state.rs:163:36
+    |
+163 |                 if token.end_ms <= self.last_final_ms {
+    |                    ------------    ^^^^^^^^^^^^^^^^^^ expected `Option<f64>`, found `u32`
+    |                    |
+    |                    expected because this is `std::option::Option<f64>`
+    |
+    = note: expected enum `std::option::Option<f64>`
+               found type `u32`
+
+error[E0308]: mismatched types
+   --> src\soniox\state.rs:170:35
+    |
+170 |                 if token.end_ms > max_ms {
+    |                    ------------   ^^^^^^ expected `Option<f64>`, found `u32`
+    |                    |
+    |                    expected because this is `std::option::Option<f64>`
+    |
+    = note: expected enum `std::option::Option<f64>`
+               found type `u32`
+
+error[E0308]: mismatched types
+   --> src\soniox\state.rs:171:30
+    |
+156 |         let mut max_ms = self.last_final_ms;
+    |                          ------------------ expected due to this value
+...
+171 |                     max_ms = token.end_ms;
+    |                              ^^^^^^^^^^^^ expected `u32`, found `Option<f64>`
+    |
+    = note: expected type `u32`
+               found enum `std::option::Option<f64>`
+
+error[E0499]: cannot borrow `*self` as mutable more than once at a time
+   --> src\soniox\state.rs:438:26
+    |
+435 |                     let last = self.finishes_lines.front_mut().unwrap();
+    |                                ------------------- first mutable borrow occurs here
+...
+438 |                          self.log_debug(format!("MERGE (Mid-word): '{}' + '{}'", last_word, chunk));
+    |                          ^^^^ second mutable borrow occurs here
+439 |                          last.text.push_str(&chunk);
+    |                          --------- first borrow later used here
+
+error[E0499]: cannot borrow `*self` as mutable more than once at a time
+   --> src\soniox\state.rs:446:30
+    |
+435 |                     let last = self.finishes_lines.front_mut().unwrap();
+    |                                ------------------- first mutable borrow occurs here
+...
+446 |                              self.log_debug(format!("MERGE (Fragment fix): '{}' + '{}'", last_word, trimmed_chunk));
+    |                              ^^^^ second mutable borrow occurs here
+447 |                              last.text.push_str(trimmed_chunk);
+    |                              --------- first borrow later used here
+
+Some errors have detailed explanations: E0308, E0499.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `sonilivetext` (lib) due to 5 previous errors

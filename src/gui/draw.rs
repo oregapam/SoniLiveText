@@ -16,62 +16,75 @@ pub(crate) fn draw_text_with_shadow<'a>(
     let thickness = 2.0;
     
     // Start from the bottom with some padding
-    let mut current_y = rect.bottom() - 10.0;
+    // let mut current_y = rect.bottom() - 10.0; // This line is removed
     let available_width = rect.width() * 0.8; // Use 80% of width
     let start_x = rect.left() + 10.0;
 
-    let mut first_item_height = 0.0;
+    // let mut first_item_height = 0.0; // This line is removed
 
-    for (index, line) in lines.enumerate() {
+    // Chronological order provided by iterator: [oldest, ..., newest, interim]
+    let render_blocks: Vec<&AudioSubtitle> = lines
+        .filter(|b| !b.displayed_text.is_empty())
+        .collect();
+
+    if render_blocks.is_empty() {
+        return 0.0;
+    }
+
+    // First pass: Layout blocks and calculate total height
+    let mut total_height = 0.0;
+    let mut layouts = Vec::with_capacity(render_blocks.len());
+
+    for (index, line) in render_blocks.iter().enumerate() {
         let mut text = String::new();
         if let Some(speaker) = &line.speaker {
             text.push_str(&format!("{} >> ", speaker));
         }
         text.push_str(&line.displayed_text);
 
-        if text.trim().is_empty() {
-            // Even if empty, if it's the first line, we might want to return 0.0 or font size?
-            // If empty, height is 0.
-            continue;
-        }
-
-        // Create main text galley with wrapping
         let galley = painter.layout(
             text.clone(),
             font.clone(),
             text_color,
             available_width,
         );
-
-        // Create shadow text galley with wrapping
+        
         let shadow_galley = painter.layout(
             text,
             font.clone(),
             outline_color,
             available_width,
         );
-
-        // Calculate position - convert bottom-up coordinate to top-left for the galley
-        // Egali galleys are drawn from top-left.
-        // We want the bottom of the galley to be at current_y.
-        let galley_height = galley.size().y;
         
-        if index == 0 {
-            first_item_height = galley_height;
+        // Double line break after sentences
+        let ends_sentence = line.text.trim_end().ends_with(|c| c == '.' || c == '?' || c == '!');
+        let height = galley.size().y;
+        let mut block_spacing = 0.0;
+        
+        // Add spacing if it ends a sentence AND it's not the very last block (interim usually doesn't end with punctuation anyway)
+        if ends_sentence && index < render_blocks.len() - 1 {
+            block_spacing = font_size * 0.8;
         }
 
-        let pos = pos2(start_x, current_y - galley_height);
+        total_height += height + block_spacing;
+        layouts.push((galley, shadow_galley, height, block_spacing));
+    }
+
+    // Second pass: Render anchored at the bottom
+    let mut current_y = rect.bottom() - 10.0 - total_height;
+    
+    let mut last_block_height = 0.0;
+
+    for (galley, shadow_galley, height, spacing) in layouts {
+        last_block_height = height;
+        let pos = pos2(start_x, current_y);
 
         // Draw shadow
         let offsets = [
-            vec2(-thickness, 0.0),
-            vec2(thickness, 0.0),
-            vec2(0.0, -thickness),
-            vec2(0.0, thickness),
-            vec2(-thickness, -thickness),
-            vec2(-thickness, thickness),
-            vec2(thickness, -thickness),
-            vec2(thickness, thickness),
+            vec2(-thickness, 0.0), vec2(thickness, 0.0),
+            vec2(0.0, -thickness), vec2(0.0, thickness),
+            vec2(-thickness, -thickness), vec2(-thickness, thickness),
+            vec2(thickness, -thickness), vec2(thickness, thickness),
         ];
 
         for offset in offsets {
@@ -81,28 +94,8 @@ pub(crate) fn draw_text_with_shadow<'a>(
         // Draw main text
         painter.galley(pos, galley, text_color);
 
-        // Check if this line ends a sentence to add extra spacing (double line break)
-        let ends_sentence = line.text.trim_end().ends_with(|c| c == '.' || c == '?' || c == '!');
-
-        // Move up for the next line, adding some spacing
-        // Word-like Wrapping: Use real height for everything to allow instant jumps.
-        let mut spacing_height = galley_height;
-        
-        if ends_sentence {
-            // Add a "double line break" effect by increasing the gap
-            spacing_height += font_size * 0.8; 
-        }
-
-        current_y -= spacing_height + (font_size * 0.2);
-        
-        // Stop if we've gone above the screen
-        if current_y < rect.top() {
-            break;
-        }
+        current_y += height + spacing;
     }
     
-    // The animation height now represents the "growth" of the newest line.
-    // When a line is committed, it's no longer 'interim', so it shouldn't be affected by interim_visual_height.
-    // To make it look like Word, the total height should transition smoothly.
-    first_item_height
+    last_block_height
 }
