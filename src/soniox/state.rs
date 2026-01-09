@@ -188,7 +188,6 @@ impl TranscriptionState {
 
         for token in response.tokens {
             let is_original = token.translation_status.as_deref() == Some("original");
-            let is_translation = token.translation_status.as_deref() == Some("translation");
             
             // Timing update: track the furthest point finalized by the AI
             if is_original && token.is_final {
@@ -330,7 +329,7 @@ impl TranscriptionState {
             };
 
             // 2. Decide if we start a new block or merge
-            let (should_start_new, reason) = match self.finishes_lines.front() {
+            let (should_start_new, _reason) = match self.finishes_lines.front() {
                 Some(last) => {
                     let last_trimmed = last.text.trim_end();
                     let ends_sentence = last_trimmed.ends_with(|c| c == '.' || c == '?' || c == '!');
