@@ -9,31 +9,7 @@ REST API is available at [https://api.soniox.com/v1](https://api.soniox.com/v1/d
 
 ## Models API
 
-```markdown
-# Get models
-URL: /stt/api-reference/models/get_models
 
-Retrieves list of available models and their attributes.
-
-***
-
-title: Get models
-description: Retrieves list of available models and their attributes.
-full: true
-\_openapi:
-method: GET
-route: /v1/models
-toc: \[]
-structuredData:
-headings: \[]
-contents:
-
-* content: Retrieves list of available models and their attributes.
-
-***
-
-<APIPage document={"./openapi/public-api.json"} operations={[{"path":"/v1/models","method":"get"}]} webhooks={[]} hasHead={false} />
-```
 
 # WebSocket API
 

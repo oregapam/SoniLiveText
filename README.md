@@ -74,6 +74,44 @@ The application is entirely controlled via the `config.toml` file.
 | `show_interim` | Boolean | If `true`, shows unstable interim text (grayed out) before finalizing. |
 | `stability_timeout_ms` | Integer | Latency buffer in ms. Higher values = more stability, lower = faster display. Default ~2000ms. |
 
+## ❓ Troubleshooting
+
+### `link.exe` not found on Windows
+
+On Windows, this project may fail to build with errors similar to:
+
+```text
+error: linker `link.exe` not found
+  = note: program not found
+
+note: the msvc targets depend on the msvc linker but `link.exe` was not found
+note: please ensure that Visual Studio 2017 or later, or Build Tools for Visual Studio were installed with the Visual C++ option.
+note: VS Code is a different product, and is not sufficient.
+
+error: could not compile `proc-macro2` (build script) due to 1 previous error
+...
+```
+
+This means Rust is using an MSVC target on Windows, but the Microsoft C++ toolchain (and its linker `link.exe`) is not installed or not visible in your environment.
+
+#### Solution: Install the MSVC build tools
+
+Download and install the **Build Tools for Visual Studio** from the official Microsoft downloads page.
+
+During installation, make sure to select the **“Desktop development with C++”** workload, which includes:
+*   MSVC C++ toolset
+*   Windows 10/11 SDK
+
+After installation, open a new terminal (Command Prompt or PowerShell) so the environment variables are refreshed.
+
+Run your build again, for example:
+
+```bash
+cargo build --release
+```
+
+If `link.exe` is correctly installed, the error should disappear.
+
 ##  CREDITS & ACKNOWLEDGEMENTS
 
 This project is a fork and advanced evolution of **[soniox_windows](https://github.com/eoftgge/soniox_windows)**.
