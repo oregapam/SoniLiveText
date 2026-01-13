@@ -13,7 +13,7 @@ pub fn start_capture_audio(
 ) -> Result<(), SonioxWindowsErrors> {
     initialize_mta()
         .ok()
-        .map_err(|_| SonioxWindowsErrors::Internal(""))?;
+        .map_err(|_| SonioxWindowsErrors::Internal("".to_string()))?;
     let enumerator = DeviceEnumerator::new()?;
     
     let direction = if input_mode == "microphone" {

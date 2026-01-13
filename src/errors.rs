@@ -22,5 +22,5 @@ pub enum SonioxWindowsErrors {
     #[error("Error in string UTF-8: {0}")]
     Utf8(#[from] std::str::Utf8Error),
     #[error("Internal error: {0}")]
-    Internal(&'static str),
+    Internal(String),
 }

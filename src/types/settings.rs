@@ -126,7 +126,7 @@ impl SettingsApp {
     pub fn level(&self) -> Result<LevelFilter, SonioxWindowsErrors> {
         LevelFilter::from_str(self.level.as_ref().expect("Validated")).map_err(|_| {
             SonioxWindowsErrors::Internal(
-                "field `level` isn't valid. did u mean `info`, `debug` and `warn`?",
+                "field `level` isn't valid. did u mean `info`, `debug` and `warn`?".to_string(),
             )
         })
     }

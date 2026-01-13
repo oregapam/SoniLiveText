@@ -23,6 +23,29 @@ async fn run() -> Result<(), SonioxWindowsErrors> {
         std::process::exit(1);
     }
 
+    // Validate model (BLOCKING)
+    if let Err(e) = sonilivetext::soniox::validation::validate_model(&settings) {
+        log::error!("Model validation failed: {}", e);
+        
+        use windows::core::w;
+        use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_OK, MB_ICONERROR};
+
+        unsafe {
+            let msg = format!("Configuration Error:\n{}\n\nPlease check config.toml and try again.", e);
+            
+            // Convert to UTF-16 for Windows API
+            let wide_msg: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+            
+            MessageBoxW(
+                None,
+                windows::core::PCWSTR(wide_msg.as_ptr()),
+                w!("SoniLiveText Error"),
+                MB_OK | MB_ICONERROR
+            );
+        }
+        std::process::exit(1);
+    }
+
     let window_width = settings.window_width();
     let window_height = settings.window_height();
     

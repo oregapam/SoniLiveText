@@ -1,3 +1,40 @@
+# [REST API](https://soniox.com/docs/stt/api-reference#rest-api)
+
+REST API is available at [https://api.soniox.com/v1](https://api.soniox.com/v1/docs) and is divided into:
+
+- **[Auth API](https://soniox.com/docs/stt/api-reference/auth/create_temporary_api_key)**: Create temporary API keys.
+- **[Files API](https://soniox.com/docs/stt/api-reference/files/get_files)**: Manage audio files by uploading, listing, retrieving, and deleting them.
+- **[Models API](https://soniox.com/docs/stt/api-reference/models/get_models)**: List available models.
+- **[Transcriptions API](https://soniox.com/docs/stt/api-reference/transcriptions/get_transcriptions)**: Create and manage transcriptions for audio files uploaded via the Files API.
+
+## Models API
+
+```markdown
+# Get models
+URL: /stt/api-reference/models/get_models
+
+Retrieves list of available models and their attributes.
+
+***
+
+title: Get models
+description: Retrieves list of available models and their attributes.
+full: true
+\_openapi:
+method: GET
+route: /v1/models
+toc: \[]
+structuredData:
+headings: \[]
+contents:
+
+* content: Retrieves list of available models and their attributes.
+
+***
+
+<APIPage document={"./openapi/public-api.json"} operations={[{"path":"/v1/models","method":"get"}]} webhooks={[]} hasHead={false} />
+```
+
 # WebSocket API
 
 ## [Overview](https://soniox.com/docs/stt/api-reference/websocket-api#overview)
