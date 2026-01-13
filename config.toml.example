@@ -5,7 +5,11 @@
 # Soniox API Key (Required)
 api_key = "YOUR_API_KEY_HERE"
 
-# List of expected source languages (e.g. ["en", "ru", "hu"])
+# Soniox model to use.
+# Options: "stt-rt-v3" (stable), "stt-rt-v3-preview" (latest features)
+model = "stt-rt-v3"
+
+# List of expected original languages (e.g. "en", "es", "ru").
 # These are hints for the speech recognition engine.
 language_hints = ["en", "hu"]
 

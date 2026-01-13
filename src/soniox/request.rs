@@ -1,5 +1,5 @@
 use crate::errors::SonioxWindowsErrors;
-use crate::soniox::MODEL;
+
 use crate::types::settings::SettingsApp;
 use crate::types::soniox::{SonioxTranscriptionRequest, SonioxTranslationObject};
 use wasapi::{DeviceEnumerator, Direction, initialize_mta};
@@ -23,7 +23,7 @@ pub(crate) fn create_request(
     let channels = format.get_nchannels();
     let mut request = SonioxTranscriptionRequest {
         api_key: settings.api_key(),
-        model: MODEL,
+        model: settings.model(),
         audio_format: "pcm_s16le",
         sample_rate: Some(sample_rate),
         num_channels: Some(channels as u32),

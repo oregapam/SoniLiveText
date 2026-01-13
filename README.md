@@ -55,6 +55,7 @@ The application is entirely controlled via the `config.toml` file.
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
 | `api_key` | String | Your Soniox API key. |
+| `model` | String | AI Model version: `"stt-rt-v3"` (stable) or `"stt-rt-v3-preview"` (latest). |
 | `language_hints` | Array | List of expected source languages (e.g., `["en", "ru", "hu"]`). |
 | `target_language` | String | Language code to translate into (e.g., `"hu"`). |
 | `enable_translate` | Boolean | Set to `true` to enable live translation. |

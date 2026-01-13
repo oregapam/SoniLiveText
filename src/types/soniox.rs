@@ -13,7 +13,7 @@ pub struct SonioxTranslationObject {
 #[serde(default)]
 pub struct SonioxTranscriptionRequest<'a> {
     pub api_key: &'a str,
-    pub model: &'static str,
+    pub model: &'a str,
     pub audio_format: &'static str,
     pub num_channels: Option<u32>,          // required for raw audio
     pub sample_rate: Option<u32>,           // required for raw audio

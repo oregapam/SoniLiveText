@@ -14,6 +14,7 @@ pub struct SettingsApp {
     pub(crate) enable_translate: Option<bool>,
     enable_high_priority: Option<bool>,
     enable_speakers: Option<bool>,
+    model: Option<String>,
     level: Option<String>,
     pub(crate) font_size: Option<f32>,
     pub(crate) text_color: Option<(u8, u8, u8)>,
@@ -48,6 +49,7 @@ impl SettingsApp {
         if self.enable_translate.is_none() { missing_fields.push("enable_translate"); }
         if self.enable_high_priority.is_none() { missing_fields.push("enable_high_priority"); }
         if self.enable_speakers.is_none() { missing_fields.push("enable_speakers"); }
+        if self.model.is_none() { missing_fields.push("model"); }
         if self.level.is_none() { missing_fields.push("level"); }
         if self.font_size.is_none() { missing_fields.push("font_size"); }
         if self.text_color.is_none() { missing_fields.push("text_color"); }
@@ -87,6 +89,10 @@ impl SettingsApp {
 
     pub fn enable_speakers(&self) -> bool {
         self.enable_speakers.expect("Validated")
+    }
+
+    pub fn model(&self) -> &str {
+        self.model.as_ref().expect("Validated")
     }
 
     pub fn enable_translate(&self) -> bool {
