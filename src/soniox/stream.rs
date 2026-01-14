@@ -1,6 +1,8 @@
 use crate::errors::SonioxWindowsErrors;
 use crate::soniox::URL;
-use crate::soniox::request::create_request;
+use crate::soniox::modes::SonioxMode;
+use crate::soniox::transcribe_mode::TranscribeMode;
+use crate::soniox::translate_mode::TranslateMode;
 use crate::types::audio::AudioMessage;
 use crate::types::settings::SettingsApp;
 use crate::types::soniox::SonioxTranscriptionResponse;
@@ -92,7 +94,16 @@ pub async fn start_soniox_stream(
     tx_transcription: UnboundedSender<SonioxTranscriptionResponse>,
     rx_audio: UnboundedReceiver<AudioMessage>,
 ) -> Result<(), SonioxWindowsErrors> {
-    let request = create_request(settings)?;
+    // START OF REFACTOR: Select Mode
+    let request = if settings.enable_translate() {
+        let mode = TranslateMode;
+        mode.create_request(settings)?
+    } else {
+        let mode = TranscribeMode;
+        mode.create_request(settings)?
+    };
+    // END OF REFACTOR
+
     let bytes = serde_json::to_vec(&request)?;
 
     log::info!("Started Soniox stream!");
