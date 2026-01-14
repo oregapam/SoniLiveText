@@ -32,11 +32,12 @@ If you are asked to modify specific features, look in these locations:
     - **Prompt:** "How does the app capture audio bytes? Where is the loopback initialization?"
 
 ### 3. AI & Network Communication (The "Brain")
-*   **Where to look:** `src/soniox/` directory (`request.rs`, `stream.rs`)
+*   **Where to look:** `src/soniox/` directory (`request.rs`, `modes.rs`, `transcribe_mode.rs`, `translate_mode.rs`, `stream.rs`)
 *   **What you'll find:**
     - Construction of JSON requests for the Soniox API.
+    - `SonioxMode` trait and its implementations (`TranscribeMode`, `TranslateMode`) handling the specific logic for each mode.
     - WebSocket connection management (`start_soniox_stream`).
-    - Handling API responses (transcription, translation).
+    - Handling API responses (transcription, translation, endpoint detection).
     - **Prompt:** "Find where the WebSocket message is sent or where the transcription response is parsed."
 
 ### 4. User Interface & Rendering (The "Face")
@@ -44,6 +45,7 @@ If you are asked to modify specific features, look in these locations:
 *   **What you'll find:**
     - The `eframe` / `egui` update loop.
     - Rendering text on the screen.
+    - **Endpoint Detection:** Immediate flushing of the event queue when "final" tokens are detected to reduce latency.
     - Handling window transparency and "click-through" behavior.
     - **Prompt:** "Where is the subtitle text actually drawn on the screen? How are fonts loaded?"
 
@@ -74,7 +76,7 @@ If you are asked to modify specific features, look in these locations:
     - Code controlling window attributes (always-on-top, transparency) is primarily in `src/main.rs` (initial setup) and potentially `src/gui/` if updated at runtime.
 
 *   **modifying API Request:**
-    - Look at `src/soniox/request.rs` to change what parameters (like `target_language`) are sent to the server.
+    - Look at `src/soniox/transcribe_mode.rs` or `translate_mode.rs` to change what parameters (like `enable_endpoint_detection`) are sent to the server.
 
 *   **Documentation Updates:**
     - **CRITICAL:** If you implement changes or new features that are relevant to the end-user (basic usage), you **MUST** update `README.md` to reflect these changes immediately.
