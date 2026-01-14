@@ -97,14 +97,32 @@ impl TranscriptionState {
         self.process_pending_events(mode);
 
         // Check for stability timeout
+        // Check for stability timeout
         if !self.interim_line.text.is_empty() && self.last_interim_update.elapsed() >= self.stability_timeout {
-            let text = std::mem::take(&mut self.interim_line.text);
-            let speaker = self.interim_line.speaker.clone();
-            self.log_debug(format!("STABILITY: Freezing after timeout: '{}'", text.trim()));
-            self.frozen_interim_history.push_str(&text);
-            let added = self.push_final(speaker, text, false);
-            self.interim_line.displayed_text.clear();
-            self.frozen_blocks_count += added;
+            let text_clone = self.interim_line.text.clone();
+            
+            // Smart Freeze: Only freeze up to the last word boundary (whitespace)
+            // This prevents "Iamthe" merging by ensuring we only commit complete words.
+            if let Some(last_space_idx) = text_clone.rfind(char::is_whitespace) {
+                let split_idx = last_space_idx + 1; // Include the space
+                let (frozen_part, remainder) = text_clone.split_at(split_idx);
+                let frozen_string = frozen_part.to_string();
+                let remainder_string = remainder.to_string();
+
+                self.log_debug(format!("STABILITY: Freezing '{}'", frozen_string.trim()));
+                
+                let speaker = self.interim_line.speaker.clone();
+                self.frozen_interim_history.push_str(&frozen_string);
+                let added = self.push_final(speaker, frozen_string, false);
+                self.frozen_blocks_count += added;
+                
+                // Keep the remainder as the new interim line
+                self.interim_line.text = remainder_string;
+                // Reset displayed text to restart typing for the remainder
+                self.interim_line.displayed_text.clear();
+                // Reset timer so the remainder has a fair chance to complete
+                self.last_interim_update = Instant::now();
+            }
         }
 
         let mut request_repaint = false;
