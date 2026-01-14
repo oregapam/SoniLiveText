@@ -38,6 +38,7 @@ If you are asked to modify specific features, look in these locations:
     - `SonioxMode` trait and its implementations (`TranscribeMode`, `TranslateMode`) handling the specific logic for each mode.
     - WebSocket connection management (`start_soniox_stream`).
     - Handling API responses (transcription, translation, endpoint detection).
+    - **Note on Translation:** `TranslateMode` strictly filters for tokens with `translation_status="translation"` and sanitizes tags (e.g. `<end>`).
     - **Prompt:** "Find where the WebSocket message is sent or where the transcription response is parsed."
 
 ### 4. User Interface & Rendering (The "Face")
