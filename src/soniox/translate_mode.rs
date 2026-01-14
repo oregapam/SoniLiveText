@@ -80,10 +80,24 @@ impl SonioxMode for TranslateMode {
         let mut max_ms = state.last_final_ms;
 
         for token in response.tokens {
-            let is_original = token.translation_status.as_deref() == Some("original");
+            // Sanitizer: Filter out <end> tags or empty text
+            if token.text.contains("<end>") {
+                continue;
+            }
+
+            // Strict Mode: In TranslateMode, we ONLY want tokens explicitly marked as "translation".
+            // "original" tokens (source language) must be filtered out to avoid mixed output.
+            let is_translation = token.translation_status.as_deref() == Some("translation");
             
+            if !is_translation {
+                continue;
+            }
+
             // Timing update: track the furthest point finalized by the AI
-            if is_original && token.is_final {
+            // Note: Translation tokens usually follow the timing of original tokens, 
+            // but might not have their own timestamps. verification needed if this logic is relevant for translation.
+            // For now, if we have a timestamp, use it.
+            if token.is_final {
                 if let Some(end_ms) = token.end_ms {
                     if end_ms > max_ms {
                         max_ms = end_ms;
@@ -93,33 +107,19 @@ impl SonioxMode for TranslateMode {
 
             if token.is_final {
                 // Deduplicate based on end_ms if available.
-                // Note: Translation tokens often lack end_ms, but they are typically 
-                // sent once per finalized segment.
                 if let Some(end_ms) = token.end_ms {
                     if end_ms <= state.last_final_ms {
                         continue;
                     }
                 }
 
-                // If we are in translation mode, we only want to display "translation" tokens.
-                // If translation mode is OFF, we want everything (which will have no status or "original").
-                let show_this_token = if is_original {
-                    // Only show original final tokens if we AREN'T expecting translations
-                    // (Actually, if we see ANY translation token in the stream, we should probably stick to them)
-                    false 
-                } else {
-                    // This is either a translated token or a normal one (no translate mode)
-                    true
-                };
-
-                if show_this_token {
-                    final_speaker = token.speaker.clone();
-                    final_text_segment.push_str(&token.text);
-                    has_final = true;
-                }
+                final_speaker = token.speaker.clone();
+                final_text_segment.push_str(&token.text);
+                has_final = true;
             } else {
                 // INTERIM processing.
-                // We show original interim text as feedback until the translation arrives.
+                // Since we filter strictly for "translation", this will now accumulate 
+                // only the translated interim text, preventing the "original text flash".
                 if interim_speaker != token.speaker {
                     interim_speaker = token.speaker.clone();
                 }
