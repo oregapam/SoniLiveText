@@ -11,6 +11,8 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 
+use crate::soniox::modes::SonioxMode;
+
 pub struct SubtitlesApp {
     rx_transcription: UnboundedReceiver<SonioxTranscriptionResponse>,
     tx_audio: UnboundedSender<AudioMessage>,
@@ -23,6 +25,7 @@ pub struct SubtitlesApp {
     show_window_border: bool,
     interim_current_height: f32,
     debug_window_enabled: bool,
+    mode: Box<dyn SonioxMode + Send + Sync>, 
 }
 
 impl SubtitlesApp {
@@ -39,6 +42,7 @@ impl SubtitlesApp {
         smart_delay_ms: u64,
         show_interim: bool,
         stability_timeout_ms: u64,
+        mode: Box<dyn SonioxMode + Send + Sync>,
     ) -> Self {
         // ... (preserving logic)
         let usable_width = window_width * 0.88;
@@ -62,6 +66,7 @@ impl SubtitlesApp {
             show_window_border,
             interim_current_height: 0.0,
             debug_window_enabled,
+            mode,
         }
     }
 }
@@ -114,7 +119,7 @@ impl App for SubtitlesApp {
                         ui.label("Recent Events:");
                         eframe::egui::ScrollArea::vertical().max_height(ui.available_height() - 20.0).show(ui, |ui| {
                             for msg in self.subtitles_state.get_debug_log().iter().rev() {
-                                ui.label(eframe::egui::RichText::new(msg).size(12.0));
+                                 ui.label(eframe::egui::RichText::new(msg).size(12.0));
                             }
                         });
                     });
@@ -142,12 +147,12 @@ impl App for SubtitlesApp {
                     initialize_tool_window(frame);
                 }
                 if let Ok(transcription) = self.rx_transcription.try_recv() {
-                    self.subtitles_state.handle_transcription(transcription);
+                    self.mode.handle_incoming(&mut self.subtitles_state, transcription);
                     // Data changed, need repaint
                     ctx.request_repaint();
                 }
                 
-                if self.subtitles_state.update_animation() {
+                if self.subtitles_state.update_animation(self.mode.as_ref()) {
                     ctx.request_repaint();
                 }
 

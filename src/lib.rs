@@ -19,6 +19,10 @@ pub mod windows;
 
 const FILE_LOG: &str = "run.log";
 
+use crate::soniox::modes::SonioxMode;
+use crate::soniox::transcribe_mode::TranscribeMode;
+use crate::soniox::translate_mode::TranslateMode;
+
 pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindowsErrors> {
     let level = settings.level()?;
     let logfile = FileAppender::builder()
@@ -31,6 +35,13 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
     let (tx_audio, rx_audio) = unbounded_channel::<AudioMessage>();
     let (tx_transcription, rx_transcription) = unbounded_channel::<SonioxTranscriptionResponse>();
     let (tx_exit, rx_exit) = unbounded_channel::<bool>();
+
+    let mode: Box<dyn SonioxMode + Send + Sync> = if settings.enable_translate() {
+        Box::new(TranslateMode)
+    } else {
+        Box::new(TranscribeMode)
+    };
+
     let app = SubtitlesApp::new(
         rx_transcription,
         tx_exit,
@@ -44,6 +55,7 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
         settings.smart_delay_ms(),
         settings.show_interim(),
         settings.stability_timeout_ms(),
+        mode,
     );
     let audio_input = settings.audio_input().to_string();
     tokio::task::spawn_blocking(move || {

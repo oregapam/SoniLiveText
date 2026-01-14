@@ -6,17 +6,17 @@ use std::time::{Duration, Instant};
 pub struct TranscriptionState {
     pub finishes_lines: VecDeque<AudioSubtitle>,
     pub interim_line: AudioSubtitle,
-    max_lines: usize,
-    max_chars_in_block: usize,
-    frozen_interim_history: String,
-    frozen_blocks_count: usize,
+    pub(crate) max_lines: usize,
+    pub(crate) max_chars_in_block: usize,
+    pub(crate) frozen_interim_history: String,
+    pub(crate) frozen_blocks_count: usize,
     pub debug_log: VecDeque<String>,
-    event_queue: VecDeque<(Instant, SonioxTranscriptionResponse)>,
-    smart_delay_ms: u64,
-    last_final_ms: f64,
-    show_interim: bool,
-    stability_timeout: Duration,
-    last_interim_update: Instant,
+    pub(crate) event_queue: VecDeque<(Instant, SonioxTranscriptionResponse)>,
+    pub(crate) smart_delay_ms: u64,
+    pub(crate) last_final_ms: f64,
+    pub(crate) show_interim: bool,
+    pub(crate) stability_timeout: Duration,
+    pub(crate) last_interim_update: Instant,
 }
 
 impl TranscriptionState {
@@ -87,41 +87,24 @@ impl TranscriptionState {
         self.finishes_lines.len()
     }
 
-    pub fn process_pending_events(&mut self) {
+    pub fn process_pending_events(&mut self, mode: &dyn crate::soniox::modes::SonioxMode) {
         let now = Instant::now();
         let delay = Duration::from_millis(self.smart_delay_ms);
 
         while let Some((timestamp, _)) = self.event_queue.front() {
             if now.duration_since(*timestamp) >= delay {
                 let (_, response) = self.event_queue.pop_front().unwrap();
-                self.process_transcription_event(response);
+                mode.process_event(self, response);
             } else {
                 break;
             }
         }
     }
 
-    pub fn handle_transcription(&mut self, response: SonioxTranscriptionResponse) {
-        let is_purely_interim = !response.tokens.iter().any(|t| t.is_final);
-        
-        if is_purely_interim {
-            if let Some((_, last_response)) = self.event_queue.back_mut() {
-                let last_is_purely_interim = !last_response.tokens.iter().any(|t| t.is_final);
-                if last_is_purely_interim {
-                    let new_speaker = response.tokens.first().map(|t| &t.speaker);
-                    let last_speaker = last_response.tokens.first().map(|t| &t.speaker);
-                    if new_speaker == last_speaker {
-                        *last_response = response;
-                        return;
-                    }
-                }
-            }
-        }
-        self.event_queue.push_back((Instant::now(), response));
-    }
 
-    pub fn update_animation(&mut self) -> bool {
-        self.process_pending_events();
+
+    pub fn update_animation(&mut self, mode: &dyn crate::soniox::modes::SonioxMode) -> bool {
+        self.process_pending_events(mode);
 
         // Check for stability timeout
         if !self.interim_line.text.is_empty() && self.last_interim_update.elapsed() >= self.stability_timeout {
@@ -177,142 +160,9 @@ impl TranscriptionState {
         request_repaint
     }
 
-    fn process_transcription_event(&mut self, response: SonioxTranscriptionResponse) {
-        let mut full_interim_text = String::new();
-        let mut interim_speaker = Option::<String>::None;
-        let mut final_text_segment = String::new();
-        let mut final_speaker = Option::<String>::None;
-        let mut has_final = false;
 
-        let mut max_ms = self.last_final_ms;
 
-        for token in response.tokens {
-            let is_original = token.translation_status.as_deref() == Some("original");
-            
-            // Timing update: track the furthest point finalized by the AI
-            if is_original && token.is_final {
-                if let Some(end_ms) = token.end_ms {
-                    if end_ms > max_ms {
-                        max_ms = end_ms;
-                    }
-                }
-            }
-
-            if token.is_final {
-                // Deduplicate based on end_ms if available.
-                // Note: Translation tokens often lack end_ms, but they are typically 
-                // sent once per finalized segment.
-                if let Some(end_ms) = token.end_ms {
-                    if end_ms <= self.last_final_ms {
-                        continue;
-                    }
-                }
-
-                // If we are in translation mode, we only want to display "translation" tokens.
-                // If translation mode is OFF, we want everything (which will have no status or "original").
-                let show_this_token = if is_original {
-                    // Only show original final tokens if we AREN'T expecting translations
-                    // (Actually, if we see ANY translation token in the stream, we should probably stick to them)
-                    false 
-                } else {
-                    // This is either a translated token or a normal one (no translate mode)
-                    true
-                };
-
-                if show_this_token {
-                    final_speaker = token.speaker.clone();
-                    final_text_segment.push_str(&token.text);
-                    has_final = true;
-                }
-            } else {
-                // INTERIM processing.
-                // We show original interim text as feedback until the translation arrives.
-                if interim_speaker != token.speaker {
-                    interim_speaker = token.speaker.clone();
-                }
-                full_interim_text.push_str(&token.text);
-            }
-        }
-
-        self.last_final_ms = max_ms;
-
-        if has_final {
-            if final_text_segment.starts_with(&self.frozen_interim_history) {
-                 let text_to_push = final_text_segment[self.frozen_interim_history.len()..].to_string();
-                 self.log_debug(format!("FINAL: Pushing suffix '{}'", text_to_push.trim()));
-                 self.push_final(final_speaker.clone(), text_to_push, false);
-                 self.frozen_blocks_count = 0;
-                 self.frozen_interim_history.clear();
-            } else if self.frozen_interim_history.starts_with(&final_text_segment) {
-                 self.log_debug(format!("FINAL: Already covered by history '{}'", final_text_segment.trim()));
-                 self.frozen_interim_history.drain(..final_text_segment.len());
-            } else {
-                self.log_debug(format!("BACKTRACK: {} ghosts because of '{}'", self.frozen_blocks_count, final_text_segment.trim()));
-                for _ in 0..self.frozen_blocks_count {
-                    self.finishes_lines.pop_front();
-                }
-                self.push_final(final_speaker.clone(), final_text_segment, false);
-                self.frozen_blocks_count = 0;
-                self.frozen_interim_history.clear();
-            }
-            // CRITICAL: Don't call update_interim("") here if we are about to call it with text below.
-            // That's what causes the "spin". We'll update it at the very end of this function.
-        }
-
-        let mut next_interim_text = String::new();
-
-        if !full_interim_text.is_empty() {
-             if !full_interim_text.starts_with(&self.frozen_interim_history) {
-                 self.log_debug("Interim drift! Resetting ghosts.".to_string());
-                 for _ in 0..self.frozen_blocks_count {
-                     self.finishes_lines.pop_front();
-                 }
-                 self.frozen_blocks_count = 0;
-                 self.frozen_interim_history.clear();
-             }
-
-             let effective_interim = full_interim_text[self.frozen_interim_history.len()..].to_string();
-             // Dynamic limit for splitting is higher than the wrapping limit to allow natural flow.
-             let split_limit = self.max_chars_in_block.max(100); 
-
-             if let Some(idx) = find_sentence_split(&effective_interim, split_limit) {
-                let (frozen_chunk, remainder) = effective_interim.split_at(idx);
-                let frozen_chunk_str = frozen_chunk.to_string();
-                self.log_debug(format!("FREEZE (Sentence): '{}'", frozen_chunk_str.trim()));
-                self.frozen_interim_history.push_str(&frozen_chunk_str);
-                let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, false);
-                self.frozen_blocks_count += added;
-                next_interim_text = remainder.to_string();
-             } else if effective_interim.len() > split_limit + 50 { // Even more slack
-                let split_idx = effective_interim.char_indices()
-                    .filter(|(i, c)| *i >= split_limit && c.is_whitespace())
-                    .map(|(i, _)| i)
-                    .next();
-
-                if let Some(idx) = split_idx {
-                    let (frozen_chunk, remainder) = effective_interim.split_at(idx);
-                    let frozen_chunk_str = frozen_chunk.to_string();
-                    self.log_debug(format!("FREEZE (Size): '{}'", frozen_chunk_str.trim()));
-                    self.frozen_interim_history.push_str(&frozen_chunk_str);
-                    let added = self.push_final(interim_speaker.clone(), frozen_chunk_str, false);
-                    self.frozen_blocks_count += added;
-                    next_interim_text = remainder.to_string();
-                } else {
-                     next_interim_text = effective_interim;
-                }
-             } else {
-                next_interim_text = effective_interim;
-             }
-        }
-        
-        // Final update to interim line
-        if self.interim_line.text != next_interim_text {
-            self.last_interim_update = Instant::now();
-        }
-        self.update_interim(interim_speaker, next_interim_text);
-    }
-
-    fn push_final(&mut self, speaker: Option<String>, mut text: String, instant: bool) -> usize {
+    pub(crate) fn push_final(&mut self, speaker: Option<String>, mut text: String, instant: bool) -> usize {
         if text.is_empty() { return 0; }
         let mut added = 0;
 
@@ -383,7 +233,7 @@ impl TranscriptionState {
         added
     }
 
-    fn update_interim(&mut self, speaker: Option<String>, text: String) {
+    pub(crate) fn update_interim(&mut self, speaker: Option<String>, text: String) {
         // If the text is the same, do nothing.
         if self.interim_line.text == text && self.interim_line.speaker == speaker {
             return;
@@ -414,7 +264,7 @@ impl TranscriptionState {
     }
 }
 
-fn find_sentence_split(text: &str, limit: usize) -> Option<usize> {
+pub(crate) fn find_sentence_split(text: &str, limit: usize) -> Option<usize> {
     text.char_indices()
         .zip(text.chars().skip(1))
         .filter(|((i, c), next_c)| {
