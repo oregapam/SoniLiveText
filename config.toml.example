@@ -87,3 +87,7 @@ audio_input = "loopback"
 
 # Logging level: "debug", "info", "warn", "error"
 level = "info"
+
+# If true, raw JSON responses from the Soniox API will be logged to "raw_data.log"
+# Useful for debugging API responses.
+enable_raw_logging = false

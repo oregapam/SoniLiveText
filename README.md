@@ -52,27 +52,40 @@ The application is entirely controlled via the `config.toml` file.
 
 **IMPORTANT: All parameters listed below are MANDATORY.** The application will verify their presence at startup and exit with an error message if any field is missing.
 
+### 1. AI & Translation Settings
+
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
 | `api_key` | String | Your Soniox API key. |
 | `model` | String | AI Model version: `"stt-rt-v3"` (stable) or `"stt-rt-v3-preview"` (latest). |
 | `language_hints` | Array | List of expected source languages (e.g., `["en", "ru", "hu"]`). |
-| `target_language` | String | Language code to translate into (e.g., `"hu"`). |
-| `enable_translate` | Boolean | Set to `true` to enable live translation. |
 | `context` | String | Context hint for the AI to improve accuracy (e.g., specific terminology). |
-| `level` | String | Logging level (e.g., `"debug"`, `"info"`). |
-| `enable_high_priority`| Boolean | If `true`, the window tries to stay on top of other applications. |
-| `show_window_border` | Boolean | If `true`, draws a border (useful for positioning). |
+| `enable_translate` | Boolean | Set to `true` to enable live translation. |
+| `target_language` | String | Language code to translate into (e.g., `"hu"`). |
 | `enable_speakers` | Boolean | If `true`, attempts to identify and label different speakers. |
-| `text_color` | Array | RGB text color, e.g., `[255, 255, 0]` for yellow. |
-| `window_anchor` | String | Positioning anchor: `bottom_center`, `top_left`, `center`, etc. |
-| `window_offset` | Array | `[x, y]` offset from the anchor point. |
+
+### 2. Window & Appearance Settings
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
 | `window_width` | Float | Width of the subtitle area in pixels. |
 | `window_height` | Float | Height of the subtitle area in pixels. |
-| `audio_input` | String | Source: `"loopback"` (system audio) or `"microphone"`. |
+| `window_anchor` | String | Positioning anchor: `bottom_center`, `top_left`, `center`, etc. |
+| `window_offset` | Array | `[x, y]` offset from the anchor point. |
 | `font_size` | Float | Font size for the text (e.g. `24.0`). |
+| `text_color` | Array | RGB text color, e.g., `[255, 255, 0]` for yellow. |
 | `show_interim` | Boolean | If `true`, shows unstable interim text (grayed out) before finalizing. |
+| `enable_high_priority`| Boolean | If `true`, the window tries to stay on top of other applications. |
+| `show_window_border` | Boolean | If `true`, draws a border (useful for positioning). |
+
+### 3. System, Audio & Logging Settings
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `audio_input` | String | Source: `"loopback"` (system audio) or `"microphone"`. |
 | `stability_timeout_ms` | Integer | Latency buffer in ms. 0 is recommended for fastest responsiveness. Default 0. |
+| `level` | String | Logging level (e.g., `"debug"`, `"info"`). |
+| `enable_raw_logging` | Boolean | If `true`, raw JSON responses from Soniox API are logged to `raw_data.log`. |
 
 ## ❓ Troubleshooting
 

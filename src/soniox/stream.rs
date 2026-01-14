@@ -18,6 +18,7 @@ async fn listen_soniox_stream(
     bytes: Vec<u8>,
     tx_transcription: UnboundedSender<SonioxTranscriptionResponse>,
     mut rx_audio: UnboundedReceiver<AudioMessage>,
+    enable_raw_logging: bool,
 ) -> Result<(), SonioxWindowsErrors> {
     'stream: loop {
         let url = URL.into_client_request()?;
@@ -32,12 +33,14 @@ async fn listen_soniox_stream(
             while let Some(msg) = read.next().await {
                 if let Message::Text(txt) = msg? {
                     // Log raw raw data to file
-                    if let Ok(mut file) = OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open("raw_data.log") 
-                    {
-                        let _ = writeln!(file, "{}", txt);
+                    if enable_raw_logging {
+                        if let Ok(mut file) = OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open("raw_data.log") 
+                        {
+                            let _ = writeln!(file, "{}", txt);
+                        }
                     }
 
                     let response: SonioxTranscriptionResponse = serde_json::from_str(&txt)?;
@@ -108,5 +111,5 @@ pub async fn start_soniox_stream(
 
     log::info!("Started Soniox stream!");
     log::info!("Starting to listen websocket stream Soniox...");
-    listen_soniox_stream(bytes, tx_transcription, rx_audio).await
+    listen_soniox_stream(bytes, tx_transcription, rx_audio, settings.enable_raw_logging()).await
 }

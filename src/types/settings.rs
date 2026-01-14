@@ -28,6 +28,7 @@ pub struct SettingsApp {
 
     pub(crate) show_interim: Option<bool>,
     pub(crate) stability_timeout_ms: Option<u64>,
+    pub(crate) enable_raw_logging: Option<bool>,
 }
 
 impl SettingsApp {
@@ -63,6 +64,7 @@ impl SettingsApp {
 
         if self.show_interim.is_none() { missing_fields.push("show_interim"); }
         if self.stability_timeout_ms.is_none() { missing_fields.push("stability_timeout_ms"); }
+        if self.enable_raw_logging.is_none() { missing_fields.push("enable_raw_logging"); }
 
 
         if !missing_fields.is_empty() {
@@ -177,5 +179,9 @@ impl SettingsApp {
 
     pub fn show_window_border(&self) -> bool {
         self.show_window_border.expect("Validated")
+    }
+
+    pub fn enable_raw_logging(&self) -> bool {
+        self.enable_raw_logging.expect("Validated")
     }
 }
