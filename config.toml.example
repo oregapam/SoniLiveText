@@ -71,10 +71,10 @@ debug_window = false
 show_interim = false
 
 # Stability Timeout (in milliseconds)
-# After this much silence/inactivity, the interim text is considered "final"
-# and is typed out normally.
-# Suggested: 300 (0.3 second).
-stability_timeout_ms = 300
+# After this much silence/inactivity, the interim text is considered "final".
+# With Smart Freeze, 0 is recommended for fastest performance.
+# Suggested: 0 (instant) or 100-300 (smoother).
+stability_timeout_ms = 0
 
 
 # ==========================================

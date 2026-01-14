@@ -72,7 +72,7 @@ The application is entirely controlled via the `config.toml` file.
 | `audio_input` | String | Source: `"loopback"` (system audio) or `"microphone"`. |
 | `font_size` | Float | Font size for the text (e.g. `24.0`). |
 | `show_interim` | Boolean | If `true`, shows unstable interim text (grayed out) before finalizing. |
-| `stability_timeout_ms` | Integer | Latency buffer in ms. Higher values = more stability, lower = faster display. Default ~2000ms. |
+| `stability_timeout_ms` | Integer | Latency buffer in ms. 0 is recommended for fastest responsiveness. Default 0. |
 
 ## ❓ Troubleshooting
 

@@ -46,6 +46,7 @@ If you are asked to modify specific features, look in these locations:
     - The `eframe` / `egui` update loop.
     - Rendering text on the screen.
     - **Endpoint Detection:** Immediate flushing of the event queue when "final" tokens are detected to reduce latency.
+    - **Smart Freeze:** Stability logic (`update_animation`) splits text at the last whitespace to prevent word merging when using low/zero timeouts.
     - Handling window transparency and "click-through" behavior.
     - **Prompt:** "Where is the subtitle text actually drawn on the screen? How are fonts loaded?"
 

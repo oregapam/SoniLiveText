@@ -35,7 +35,7 @@ impl TranscriptionState {
 
             last_final_ms: 0.0,
             show_interim: true,
-            stability_timeout: Duration::from_millis(1000),
+            stability_timeout: Duration::from_millis(0),
             last_interim_update: Instant::now(),
         }
     }
