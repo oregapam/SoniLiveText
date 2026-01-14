@@ -39,7 +39,6 @@ impl SubtitlesApp {
         show_window_border: bool,
         window_width: f32,
         debug_window_enabled: bool,
-        smart_delay_ms: u64,
         show_interim: bool,
         stability_timeout_ms: u64,
         mode: Box<dyn SonioxMode + Send + Sync>,
@@ -51,7 +50,6 @@ impl SubtitlesApp {
         let max_chars = ((chars_per_line * 0.95) as usize).max(50);
 
         let mut subtitles_state = TranscriptionState::new(50, max_chars);
-        subtitles_state.set_smart_delay(smart_delay_ms);
         subtitles_state.set_stability_params(show_interim, stability_timeout_ms);
 
         Self {

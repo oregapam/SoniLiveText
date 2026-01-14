@@ -52,7 +52,6 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
         settings.show_window_border(),
         settings.window_width(),
         settings.debug_window(),
-        settings.smart_delay_ms(),
         settings.show_interim(),
         settings.stability_timeout_ms(),
         mode,

@@ -66,11 +66,6 @@ show_window_border = false
 # This window is always on top.
 debug_window = false
 
-# Smart Buffering Delay (in milliseconds)
-# Delays display of interim text to allow for more stable corrections.
-# Suggested: 0 (instant) or 200-500 (more stable).
-smart_delay_ms = 0
-
 # If true, shows the tentative "interim" text as it's being recognized.
 # If false, only finalized or stabilized sentences are shown.
 show_interim = false
@@ -78,8 +73,8 @@ show_interim = false
 # Stability Timeout (in milliseconds)
 # After this much silence/inactivity, the interim text is considered "final"
 # and is typed out normally.
-# Suggested: 1000 (1 second).
-stability_timeout_ms = 1000
+# Suggested: 300 (0.3 second).
+stability_timeout_ms = 300
 
 
 # ==========================================

@@ -12,7 +12,7 @@ pub struct TranscriptionState {
     pub(crate) frozen_blocks_count: usize,
     pub debug_log: VecDeque<String>,
     pub(crate) event_queue: VecDeque<(Instant, SonioxTranscriptionResponse)>,
-    pub(crate) smart_delay_ms: u64,
+
     pub(crate) last_final_ms: f64,
     pub(crate) show_interim: bool,
     pub(crate) stability_timeout: Duration,
@@ -32,7 +32,7 @@ impl TranscriptionState {
             frozen_blocks_count: 0,
             debug_log: VecDeque::with_capacity(20),
             event_queue: VecDeque::new(),
-            smart_delay_ms: 0,
+
             last_final_ms: 0.0,
             show_interim: true,
             stability_timeout: Duration::from_millis(1000),
@@ -70,9 +70,7 @@ impl TranscriptionState {
         self.max_chars_in_block
     }
 
-    pub fn set_smart_delay(&mut self, delay_ms: u64) {
-        self.smart_delay_ms = delay_ms;
-    }
+
 
     pub fn set_stability_params(&mut self, show_interim: bool, timeout_ms: u64) {
         self.show_interim = show_interim;
@@ -88,24 +86,8 @@ impl TranscriptionState {
     }
 
     pub fn process_pending_events(&mut self, mode: &dyn crate::soniox::modes::SonioxMode) {
-        let now = Instant::now();
-        let delay = Duration::from_millis(self.smart_delay_ms);
-
-        let mut flush_count = 0;
-        for (i, (timestamp, response)) in self.event_queue.iter().enumerate() {
-            let is_ripe = now.duration_since(*timestamp) >= delay;
-            // Urgent if it has final tokens (Endpoint Detection triggered)
-            let is_urgent = response.tokens.iter().any(|t| t.is_final); 
-            
-            if is_ripe || is_urgent {
-                flush_count = i + 1;
-            }
-        }
-
-        for _ in 0..flush_count {
-            if let Some((_, response)) = self.event_queue.pop_front() {
-                mode.process_event(self, response);
-            }
+        while let Some((_, response)) = self.event_queue.pop_front() {
+            mode.process_event(self, response);
         }
     }
 
