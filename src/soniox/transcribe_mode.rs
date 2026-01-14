@@ -45,6 +45,7 @@ impl SonioxMode for TranscribeMode {
             language_hints: settings.language_hints(),
             enable_speaker_diarization: Some(settings.enable_speakers()),
             enable_non_final_tokens: Some(true),
+            enable_endpoint_detection: Some(true),
             ..Default::default()
         };
 

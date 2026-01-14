@@ -91,12 +91,20 @@ impl TranscriptionState {
         let now = Instant::now();
         let delay = Duration::from_millis(self.smart_delay_ms);
 
-        while let Some((timestamp, _)) = self.event_queue.front() {
-            if now.duration_since(*timestamp) >= delay {
-                let (_, response) = self.event_queue.pop_front().unwrap();
+        let mut flush_count = 0;
+        for (i, (timestamp, response)) in self.event_queue.iter().enumerate() {
+            let is_ripe = now.duration_since(*timestamp) >= delay;
+            // Urgent if it has final tokens (Endpoint Detection triggered)
+            let is_urgent = response.tokens.iter().any(|t| t.is_final); 
+            
+            if is_ripe || is_urgent {
+                flush_count = i + 1;
+            }
+        }
+
+        for _ in 0..flush_count {
+            if let Some((_, response)) = self.event_queue.pop_front() {
                 mode.process_event(self, response);
-            } else {
-                break;
             }
         }
     }
