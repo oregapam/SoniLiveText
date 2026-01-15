@@ -26,7 +26,7 @@ use crate::soniox::translate_mode::TranslateMode;
 pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindowsErrors> {
     let level = settings.level()?;
     let logfile = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{d} - {m}\n")))
+        .encoder(Box::new(PatternEncoder::new("{d} - {l} - {m}\n")))
         .build(FILE_LOG)?;
     let config = Config::builder()
         .appender(Appender::builder().build("logfile", Box::new(logfile)))

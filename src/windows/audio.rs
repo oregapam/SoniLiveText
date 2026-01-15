@@ -244,7 +244,7 @@ fn start_dual_capture(
 
         // Reduced log frequency: log only if amp > 0.01 (silence is usually near 0)
         if max_amp > 0.001 {
-             log::info!("Mixer chunk positive. Max Amp: {}", max_amp);
+             log::debug!("Mixer chunk positive. Max Amp: {}", max_amp);
         } else {
              // log::debug!("Mixer chunk silence.");
         }

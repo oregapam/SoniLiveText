@@ -20,9 +20,9 @@ async fn listen_soniox_stream(
     mut rx_audio: UnboundedReceiver<AudioMessage>,
     enable_raw_logging: bool,
 ) -> Result<(), SonioxWindowsErrors> {
-    log::info!("listen_soniox_stream: START");
+    log::debug!("listen_soniox_stream: START");
     'stream: loop {
-        log::info!("listen_soniox_stream: Connecting to URL...");
+        log::debug!("listen_soniox_stream: Connecting to URL...");
         let url = URL.into_client_request()?;
         let (ws_stream, _) = match connect_async(url).await {
             Ok(v) => v,
@@ -31,24 +31,24 @@ async fn listen_soniox_stream(
                 return Err(SonioxWindowsErrors::Internal(e.to_string()));
             }
         };
-        log::info!("listen_soniox_stream: Connected!");
+        log::debug!("listen_soniox_stream: Connected!");
         
         let (mut write, mut read) = ws_stream.split();
         let json_str = String::from_utf8_lossy(&bytes);
-        log::info!("listen_soniox_stream: Sending JSON: {}", json_str);
+        log::debug!("listen_soniox_stream: Sending JSON: {}", json_str);
         if let Err(e) = write.send(Message::Text(Utf8Bytes::try_from(bytes.clone())?)).await {
              log::error!("listen_soniox_stream: Failed to send initial JSON: {:?}", e);
              return Err(SonioxWindowsErrors::Internal(e.to_string()));
         }
-        log::info!("listen_soniox_stream: Initial JSON Sent.");
+        log::debug!("listen_soniox_stream: Initial JSON Sent.");
 
         let tx_subs = tx_transcription.clone();
         let reader = async move {
-            log::info!("listen_soniox_stream: Reader Task Started.");
+            log::debug!("listen_soniox_stream: Reader Task Started.");
             while let Some(msg) = read.next().await {
                 match msg {
                      Ok(Message::Text(txt)) => {
-                        log::info!("Received Soniox Message: {}", txt);
+                        log::debug!("Received Soniox Message: {}", txt);
                         // Log raw raw data to file
                         if enable_raw_logging {
                             if let Ok(mut file) = OpenOptions::new()
@@ -67,7 +67,7 @@ async fn listen_soniox_stream(
                         }
                      },
                      Ok(Message::Close(c)) => {
-                         log::info!("listen_soniox_stream: Server sent CLOSE: {:?}", c);
+                         log::debug!("listen_soniox_stream: Server sent CLOSE: {:?}", c);
                          break;
                      },
                      Err(e) => {
@@ -77,7 +77,7 @@ async fn listen_soniox_stream(
                      _ => {} // Ignore Ping/Pong/Binary
                 }
             }
-            log::info!("listen_soniox_stream: Reader Task FINISHED (Socket closed?).");
+            log::debug!("listen_soniox_stream: Reader Task FINISHED (Socket closed?).");
             <Result<(), SonioxWindowsErrors>>::Ok(())
         };
 
@@ -87,7 +87,7 @@ async fn listen_soniox_stream(
                 .inspect_err(|err| log::error!("error during read message: {}", err));
         });
 
-        log::info!("listen_soniox_stream: Starting Audio Loop...");
+        log::debug!("listen_soniox_stream: Starting Audio Loop...");
         while let Some(message) = rx_audio.recv().await {
             match message {
                 AudioMessage::Audio(buffer) => {
@@ -115,14 +115,14 @@ async fn listen_soniox_stream(
                     }
                 }
                 AudioMessage::Stop => {
-                    log::info!("listen_soniox_stream: Received STOP message. Closing stream.");
+                    log::debug!("listen_soniox_stream: Received STOP message. Closing stream.");
                     let _ = write.send(Message::Binary(Bytes::new())).await;
                     break 'stream;
                 }
             }
         }
         
-        log::info!("listen_soniox_stream: RX_AUDIO loop finished (Sender dropped or Break).");
+        log::debug!("listen_soniox_stream: RX_AUDIO loop finished (Sender dropped or Break).");
 
         let _ = write
             .send(Message::Binary(Bytes::new()))
@@ -131,7 +131,7 @@ async fn listen_soniox_stream(
         break 'stream;
     }
 
-    log::info!("listen_soniox_stream: RETURNING Ok. Stream Ended.");
+    log::debug!("listen_soniox_stream: RETURNING Ok. Stream Ended.");
     Ok(())
 }
 
@@ -146,7 +146,7 @@ pub async fn start_soniox_stream(
     // We lift this logic OUT of the mode and OUT of the request builder.
     // It is now strictly decided here before any request is formed.
     let (sample_rate, channels) = if settings.audio_input().trim() == "both" {
-        log::info!("start_soniox_stream: 'both' mode detected -> Forcing 16000Hz Mono");
+        log::debug!("start_soniox_stream: 'both' mode detected -> Forcing 16000Hz Mono");
         (16000, 1)
     } else {
          use wasapi::{DeviceEnumerator, Direction, initialize_mta};
@@ -179,7 +179,7 @@ pub async fn start_soniox_stream(
 
     let bytes = serde_json::to_vec(&request)?;
 
-    log::info!("Started Soniox stream!");
-    log::info!("Starting to listen websocket stream Soniox...");
+    log::debug!("Started Soniox stream!");
+    log::debug!("Starting to listen websocket stream Soniox...");
     listen_soniox_stream(bytes, tx_transcription, rx_audio, settings.enable_raw_logging()).await
 }
