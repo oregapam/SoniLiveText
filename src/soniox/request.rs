@@ -6,21 +6,12 @@ use wasapi::{DeviceEnumerator, Direction, initialize_mta};
 
 pub(crate) fn create_request(
     settings: &'_ SettingsApp,
+    audio_format: (u32, u16), // (sample_rate, channels)
 ) -> Result<SonioxTranscriptionRequest<'_>, SonioxWindowsErrors> {
-    initialize_mta().ok()?;
-    let enumerator = DeviceEnumerator::new()?;
+    let (sample_rate, channels) = audio_format;
     
-    let direction = if settings.audio_input() == "microphone" {
-        Direction::Capture
-    } else {
-        Direction::Render
-    };
-    
-    let device = enumerator.get_default_device(&direction)?;
-    let audio_client = device.get_iaudioclient()?;
-    let format = audio_client.get_mixformat()?;
-    let sample_rate = format.get_samplespersec();
-    let channels = format.get_nchannels();
+    // Log final used format for verification
+    log::info!("create_request: Using Explicit Format -> Sample Rate: {}, Channels: {}", sample_rate, channels);
     let mut request = SonioxTranscriptionRequest {
         api_key: settings.api_key(),
         model: settings.model(),

@@ -11,21 +11,8 @@ use crate::types::soniox::SonioxTranscriptionResponse;
 use std::time::Instant;
 
 impl SonioxMode for TranslateMode {
-    fn create_request<'a>(&self, settings: &'a SettingsApp) -> Result<SonioxTranscriptionRequest<'a>, SonioxWindowsErrors> {
-        let _ = initialize_mta().ok();
-        let enumerator = DeviceEnumerator::new()?;
-        
-        let direction = if settings.audio_input() == "microphone" {
-            Direction::Capture
-        } else {
-            Direction::Render
-        };
-        
-        let device = enumerator.get_default_device(&direction)?;
-        let audio_client = device.get_iaudioclient()?;
-        let format = audio_client.get_mixformat()?;
-        let sample_rate = format.get_samplespersec();
-        let channels = format.get_nchannels();
+    fn create_request<'a>(&self, settings: &'a SettingsApp, audio_format: (u32, u16)) -> Result<SonioxTranscriptionRequest<'a>, SonioxWindowsErrors> {
+        let (sample_rate, channels) = audio_format;
         
         let translation_obj = SonioxTranslationObject {
             r#type: "one_way",

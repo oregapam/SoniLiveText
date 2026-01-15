@@ -14,26 +14,8 @@ use crate::types::soniox::SonioxTranscriptionResponse;
 use std::time::Instant;
 
 impl SonioxMode for TranscribeMode {
-    fn create_request<'a>(&self, settings: &'a SettingsApp) -> Result<SonioxTranscriptionRequest<'a>, SonioxWindowsErrors> {
-        // Reuse logic from request.rs but specific for transcription
-        // Note: For now, I will assume we can refactor request.rs to export a helper for common audio setup
-        // OR I will duplicate the common setup to ensure clean decoupling as requested.
-        // Duplication is safer for "splitting" to avoid shared dependencies we might want to diverge later.
-        
-        let _ = initialize_mta().ok(); // Ignoring result as in original
-        let enumerator = DeviceEnumerator::new()?;
-        
-        let direction = if settings.audio_input() == "microphone" {
-            Direction::Capture
-        } else {
-            Direction::Render
-        };
-        
-        let device = enumerator.get_default_device(&direction)?;
-        let audio_client = device.get_iaudioclient()?;
-        let format = audio_client.get_mixformat()?;
-        let sample_rate = format.get_samplespersec();
-        let channels = format.get_nchannels();
+    fn create_request<'a>(&self, settings: &'a SettingsApp, audio_format: (u32, u16)) -> Result<SonioxTranscriptionRequest<'a>, SonioxWindowsErrors> {
+        let (sample_rate, channels) = audio_format;
         
         let request = SonioxTranscriptionRequest {
             api_key: settings.api_key(),

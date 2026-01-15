@@ -20,33 +20,64 @@ async fn listen_soniox_stream(
     mut rx_audio: UnboundedReceiver<AudioMessage>,
     enable_raw_logging: bool,
 ) -> Result<(), SonioxWindowsErrors> {
+    log::info!("listen_soniox_stream: START");
     'stream: loop {
+        log::info!("listen_soniox_stream: Connecting to URL...");
         let url = URL.into_client_request()?;
-        let (ws_stream, _) = connect_async(url).await?;
+        let (ws_stream, _) = match connect_async(url).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("listen_soniox_stream: Connect FAILED: {:?}", e);
+                return Err(SonioxWindowsErrors::Internal(e.to_string()));
+            }
+        };
+        log::info!("listen_soniox_stream: Connected!");
+        
         let (mut write, mut read) = ws_stream.split();
-        write
-            .send(Message::Text(Utf8Bytes::try_from(bytes.clone())?))
-            .await?;
+        let json_str = String::from_utf8_lossy(&bytes);
+        log::info!("listen_soniox_stream: Sending JSON: {}", json_str);
+        if let Err(e) = write.send(Message::Text(Utf8Bytes::try_from(bytes.clone())?)).await {
+             log::error!("listen_soniox_stream: Failed to send initial JSON: {:?}", e);
+             return Err(SonioxWindowsErrors::Internal(e.to_string()));
+        }
+        log::info!("listen_soniox_stream: Initial JSON Sent.");
 
         let tx_subs = tx_transcription.clone();
         let reader = async move {
+            log::info!("listen_soniox_stream: Reader Task Started.");
             while let Some(msg) = read.next().await {
-                if let Message::Text(txt) = msg? {
-                    // Log raw raw data to file
-                    if enable_raw_logging {
-                        if let Ok(mut file) = OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open("raw_data.log") 
-                        {
-                            let _ = writeln!(file, "{}", txt);
+                match msg {
+                     Ok(Message::Text(txt)) => {
+                        log::info!("Received Soniox Message: {}", txt);
+                        // Log raw raw data to file
+                        if enable_raw_logging {
+                            if let Ok(mut file) = OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open("raw_data.log") 
+                            {
+                                let _ = writeln!(file, "{}", txt);
+                            }
                         }
-                    }
 
-                    let response: SonioxTranscriptionResponse = serde_json::from_str(&txt)?;
-                    let _ = tx_subs.send(response);
+                        if let Ok(response) = serde_json::from_str::<SonioxTranscriptionResponse>(&txt) {
+                             let _ = tx_subs.send(response);
+                        } else {
+                             log::warn!("Failed to parse Soniox response: {}", txt);
+                        }
+                     },
+                     Ok(Message::Close(c)) => {
+                         log::info!("listen_soniox_stream: Server sent CLOSE: {:?}", c);
+                         break;
+                     },
+                     Err(e) => {
+                         log::error!("listen_soniox_stream: Read Error: {:?}", e);
+                         break;
+                     }
+                     _ => {} // Ignore Ping/Pong/Binary
                 }
             }
+            log::info!("listen_soniox_stream: Reader Task FINISHED (Socket closed?).");
             <Result<(), SonioxWindowsErrors>>::Ok(())
         };
 
@@ -56,12 +87,17 @@ async fn listen_soniox_stream(
                 .inspect_err(|err| log::error!("error during read message: {}", err));
         });
 
+        log::info!("listen_soniox_stream: Starting Audio Loop...");
         while let Some(message) = rx_audio.recv().await {
             match message {
                 AudioMessage::Audio(buffer) => {
                     if buffer.is_empty() {
+                        log::warn!("listen_soniox_stream: Received EMPTY BUFFER. Breaking loop (Original Logic).");
                         break;
                     }
+                    // Debug: Log every Nth packet to ensure flow? 
+                    // No, too spammy.
+                    
                     let mut pcm16 = Vec::with_capacity(buffer.len() * 2);
                     for s in buffer {
                         let sample = (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
@@ -69,18 +105,24 @@ async fn listen_soniox_stream(
                     }
 
                     let result = write.send(Message::Binary(Bytes::from(pcm16))).await;
+                    
+                    // Very verbose, but necessary for now
+                    // log::info!("listen_soniox_stream: Sent binary packet.");
 
                     if let Err(err) = result {
-                        log::error!("error during sent binary -> {:?}", err);
+                        log::error!("listen_soniox_stream: error during sent binary -> {:?}. Reconnecting...", err);
                         continue 'stream;
                     }
                 }
                 AudioMessage::Stop => {
+                    log::info!("listen_soniox_stream: Received STOP message. Closing stream.");
                     let _ = write.send(Message::Binary(Bytes::new())).await;
                     break 'stream;
                 }
             }
         }
+        
+        log::info!("listen_soniox_stream: RX_AUDIO loop finished (Sender dropped or Break).");
 
         let _ = write
             .send(Message::Binary(Bytes::new()))
@@ -89,6 +131,7 @@ async fn listen_soniox_stream(
         break 'stream;
     }
 
+    log::info!("listen_soniox_stream: RETURNING Ok. Stream Ended.");
     Ok(())
 }
 
@@ -98,12 +141,39 @@ pub async fn start_soniox_stream(
     rx_audio: UnboundedReceiver<AudioMessage>,
 ) -> Result<(), SonioxWindowsErrors> {
     // START OF REFACTOR: Select Mode
+    
+    // Determine Audio Format (The "Deep Research" Fix)
+    // We lift this logic OUT of the mode and OUT of the request builder.
+    // It is now strictly decided here before any request is formed.
+    let (sample_rate, channels) = if settings.audio_input().trim() == "both" {
+        log::info!("start_soniox_stream: 'both' mode detected -> Forcing 16000Hz Mono");
+        (16000, 1)
+    } else {
+         use wasapi::{DeviceEnumerator, Direction, initialize_mta};
+         let _ = initialize_mta().ok();
+         let enumerator = DeviceEnumerator::new()?;
+         let direction = if settings.audio_input() == "microphone" {
+            Direction::Capture
+        } else {
+            Direction::Render
+        };
+        let device = enumerator.get_default_device(&direction)?;
+        let audio_client = device.get_iaudioclient()?;
+        let format = audio_client.get_mixformat()?;
+        let sr = format.get_samplespersec();
+        let ch = format.get_nchannels();
+        log::info!("start_soniox_stream: Single device mode -> Detected {}Hz {}ch", sr, ch);
+        (sr, ch)
+    };
+    
+    let audio_format = (sample_rate, channels);
+
     let request = if settings.enable_translate() {
         let mode = TranslateMode;
-        mode.create_request(settings)?
+        mode.create_request(settings, audio_format)?
     } else {
         let mode = TranscribeMode;
-        mode.create_request(settings)?
+        mode.create_request(settings, audio_format)?
     };
     // END OF REFACTOR
 

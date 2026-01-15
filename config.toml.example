@@ -82,8 +82,8 @@ stability_timeout_ms = 0
 # ==========================================
 
 # Audio input source.
-# Options: "loopback" (system audio) or "microphone"
-audio_input = "loopback"
+# Options: "loopback" (system audio), "microphone", or "both"
+audio_input = "both"
 
 # Logging level: "debug", "info", "warn", "error"
 level = "info"
