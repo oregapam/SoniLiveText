@@ -57,8 +57,9 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
         mode,
     );
     let audio_input = settings.audio_input().to_string();
+    let enable_audio_logging = settings.enable_audio_logging();
     tokio::task::spawn_blocking(move || {
-        if let Err(err) = start_capture_audio(tx_audio, rx_exit, &audio_input) {
+        if let Err(err) = start_capture_audio(tx_audio, rx_exit, &audio_input, enable_audio_logging) {
             log::error!("{}", err);
         }
     });

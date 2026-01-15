@@ -17,11 +17,12 @@ pub fn start_capture_audio(
     tx_audio: UnboundedSender<AudioMessage>,
     rx_stop: UnboundedReceiver<bool>,
     input_mode: &str,
+    enable_audio_logging: bool,
 ) -> Result<(), SonioxWindowsErrors> {
     if input_mode == "both" {
-        start_dual_capture(tx_audio, rx_stop)
+        start_dual_capture(tx_audio, rx_stop, enable_audio_logging)
     } else {
-        start_single_capture(tx_audio, rx_stop, input_mode)
+        start_single_capture(tx_audio, rx_stop, input_mode, enable_audio_logging)
     }
 }
 
@@ -29,6 +30,7 @@ fn start_single_capture(
     tx_audio: UnboundedSender<AudioMessage>,
     mut rx_stop: UnboundedReceiver<bool>,
     input_mode: &str,
+    enable_audio_logging: bool,
 ) -> Result<(), SonioxWindowsErrors> {
     initialize_mta()
         .ok()
@@ -56,18 +58,22 @@ fn start_single_capture(
     audio_client.start_stream()?;
 
     // Initialize WAV writer for debugging
-    let spec = hound::WavSpec {
-        channels: format.get_nchannels(),
-        sample_rate: format.get_samplespersec(),
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let mut wav_writer = match hound::WavWriter::create("debug_audio.wav", spec) {
-        Ok(w) => Some(w),
-        Err(e) => {
-            log::error!("Failed to create debug_audio.wav: {}", e);
-            None
+    let mut wav_writer = if enable_audio_logging {
+        let spec = hound::WavSpec {
+            channels: format.get_nchannels(),
+            sample_rate: format.get_samplespersec(),
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        match hound::WavWriter::create("debug_audio.wav", spec) {
+            Ok(w) => Some(w),
+            Err(e) => {
+                log::error!("Failed to create debug_audio.wav: {}", e);
+                None
+            }
         }
+    } else {
+        None
     };
 
     log::info!("Started single audio stream: {}", input_mode);
@@ -120,6 +126,7 @@ fn start_single_capture(
 fn start_dual_capture(
     tx_audio: UnboundedSender<AudioMessage>,
     mut rx_stop: UnboundedReceiver<bool>,
+    enable_audio_logging: bool,
 ) -> Result<(), SonioxWindowsErrors> {
     initialize_mta()
         .ok()
@@ -153,18 +160,22 @@ fn start_dual_capture(
     log::info!("Mixer Loop Starting...");
 
     // Initialize WAV writer
-    let spec = hound::WavSpec {
-        channels: 1,
-        sample_rate: 16000,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let mut wav_writer = match hound::WavWriter::create("debug_audio.wav", spec) {
-        Ok(w) => Some(w),
-        Err(e) => {
-            log::error!("Failed to create debug_audio.wav: {}", e);
-            None
+    let mut wav_writer = if enable_audio_logging {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 16000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        match hound::WavWriter::create("debug_audio.wav", spec) {
+            Ok(w) => Some(w),
+            Err(e) => {
+                log::error!("Failed to create debug_audio.wav: {}", e);
+                None
+            }
         }
+    } else {
+        None
     };
 
     // --- 3. Mixer Loop ---

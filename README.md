@@ -82,10 +82,11 @@ The application is entirely controlled via the `config.toml` file.
 
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
-| `audio_input` | String | Source: `"loopback"` (system audio) or `"microphone"`. |
+| `audio_input` | String | Source: `"loopback"` (system audio), `"microphone"`, or `"both"` (dual capture). |
 | `stability_timeout_ms` | Integer | Latency buffer in ms. 0 is recommended for fastest responsiveness. Default 0. |
 | `level` | String | Logging level (e.g., `"debug"`, `"info"`). |
 | `enable_raw_logging` | Boolean | If `true`, raw JSON responses from Soniox API are logged to `raw_data.log`. |
+| `enable_audio_logging` | Boolean | If `true`, the captured audio stream is saved to `debug_audio.wav` (useful for troubleshooting silence/noise). |
 
 ## ❓ Troubleshooting
 

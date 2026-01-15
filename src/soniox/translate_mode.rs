@@ -2,7 +2,7 @@ use crate::errors::SonioxWindowsErrors;
 use crate::types::settings::SettingsApp;
 use crate::types::soniox::{SonioxTranscriptionRequest, SonioxTranslationObject};
 use crate::soniox::modes::SonioxMode;
-use wasapi::{DeviceEnumerator, Direction, initialize_mta};
+// use wasapi::{DeviceEnumerator, Direction, initialize_mta};
 
 pub struct TranslateMode;
 

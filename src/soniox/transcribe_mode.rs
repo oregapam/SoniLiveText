@@ -2,7 +2,7 @@ use crate::errors::SonioxWindowsErrors;
 use crate::types::settings::SettingsApp;
 use crate::types::soniox::SonioxTranscriptionRequest;
 use crate::soniox::modes::SonioxMode;
-use wasapi::{DeviceEnumerator, Direction, initialize_mta};
+// use wasapi::{DeviceEnumerator, Direction, initialize_mta};
 // use crate::soniox::request::get_audio_config; // Removed: Logic duplicated locally. 
 // Actually, let's keep it simple first and duplicate if needed or extract a helper.
 // The original create_request had device initialization. It's better to extract that helper.
