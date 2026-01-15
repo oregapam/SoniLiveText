@@ -55,6 +55,21 @@ fn start_single_capture(
     let capture = audio_client.get_audiocaptureclient()?;
     audio_client.start_stream()?;
 
+    // Initialize WAV writer for debugging
+    let spec = hound::WavSpec {
+        channels: format.get_nchannels(),
+        sample_rate: format.get_samplespersec(),
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut wav_writer = match hound::WavWriter::create("debug_audio.wav", spec) {
+        Ok(w) => Some(w),
+        Err(e) => {
+            log::error!("Failed to create debug_audio.wav: {}", e);
+            None
+        }
+    };
+
     log::info!("Started single audio stream: {}", input_mode);
     loop {
         if let Ok(true) = rx_stop.try_recv() {
@@ -79,6 +94,16 @@ fn start_single_capture(
         } else {
             cast_slice::<u8, f32>(&buffer).to_vec()
         };
+
+        // Write to WAV for debugging
+        if let Some(writer) = &mut wav_writer {
+            for &sample in &final_buffer {
+                 let amplitude = (sample * i16::MAX as f32).clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+                 if let Err(e) = writer.write_sample(amplitude) {
+                     log::error!("Failed to write sample to WAV: {}", e);
+                 }
+            }
+        }
         let result = tx_audio.send(AudioMessage::Audio(final_buffer));
 
         if let Err(err) = result {
