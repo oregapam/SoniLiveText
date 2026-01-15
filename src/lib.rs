@@ -54,6 +54,8 @@ pub fn initialize_app(settings: SettingsApp) -> Result<SubtitlesApp, SonioxWindo
         settings.debug_window(),
         settings.show_interim(),
         settings.stability_timeout_ms(),
+        settings.save_transcription(),
+        settings.transcript_save_path(),
         mode,
     );
     let audio_input = settings.audio_input().to_string();

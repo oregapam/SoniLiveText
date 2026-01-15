@@ -30,6 +30,9 @@ pub struct SettingsApp {
     pub(crate) stability_timeout_ms: Option<u64>,
     pub(crate) enable_raw_logging: Option<bool>,
     pub(crate) enable_audio_logging: Option<bool>,
+
+    pub(crate) save_transcription: Option<bool>,
+    pub(crate) transcript_save_path: Option<String>,
 }
 
 impl SettingsApp {
@@ -67,6 +70,13 @@ impl SettingsApp {
         if self.stability_timeout_ms.is_none() { missing_fields.push("stability_timeout_ms"); }
         if self.enable_raw_logging.is_none() { missing_fields.push("enable_raw_logging"); }
         if self.enable_audio_logging.is_none() { missing_fields.push("enable_audio_logging"); }
+        
+        if self.save_transcription.is_none() { missing_fields.push("save_transcription"); }
+        // transcript_save_path is optional, defaults to "transcript.txt" if missing/but logging enabled?
+        // Actually, let's make it mandatory if logging is enabled, or just mandatory with a default suggestion in example.
+        // User rules say "All configuration parameters in config.toml must be mandatory."
+        // So we strictly enforce it.
+        if self.transcript_save_path.is_none() { missing_fields.push("transcript_save_path"); }
 
 
         if !missing_fields.is_empty() {
@@ -189,5 +199,13 @@ impl SettingsApp {
 
     pub fn enable_audio_logging(&self) -> bool {
         self.enable_audio_logging.expect("Validated")
+    }
+
+    pub fn save_transcription(&self) -> bool {
+        self.save_transcription.expect("Validated")
+    }
+
+    pub fn transcript_save_path(&self) -> &str {
+        self.transcript_save_path.as_ref().expect("Validated")
     }
 }

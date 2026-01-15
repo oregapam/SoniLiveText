@@ -40,7 +40,8 @@ If you are asked to modify specific features, look in these locations:
     - `SonioxMode` trait and its implementations (`TranscribeMode`, `TranslateMode`) handling the specific logic for each mode.
     - **Audio Format:** `start_soniox_stream` (in `stream.rs`) now explicitly determines the audio format (Sample Rate/Channels) *before* creating the request. This is crucial for "Dual Mode" (forced to 16kHz Mono) to avoid metadata mismatches.
     - WebSocket connection management (`start_soniox_stream`).
-    - **Logging:** Detailed session logs (e.g., "Received Soniox Message") are now at `DEBUG` level to reduce noise.
+    - **Logging:** Detailed session logs are at `DEBUG` level.
+    - **Transcript Logging:** `TranscriptionState` (in `state.rs`) handles writing authoritative "Final" text segments to a local file (`transcript.txt`) if `save_transcription` is enabled. It uses `OpenOptions::truncate(true)` to overwrite on startup and inserts smart paragraph breaks (double newlines) while preserving decimals.
     - Handling API responses (transcription, translation, endpoint detection).
     - **Note on Translation:** `TranslateMode` strictly filters for tokens with `translation_status="translation"` and sanitizes tags (e.g. `<end>`).
     - **Prompt:** "Find where the WebSocket message is sent or where the transcription response is parsed."

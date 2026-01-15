@@ -93,3 +93,11 @@ enable_raw_logging = false
 
 # Enable audio stream logging to 'debug_audio.wav' for debugging purposes.
 enable_audio_logging = false
+
+# Enable writing the final transcription/translation to a text file.
+save_transcription = false
+
+# Path to the transcript save file.
+# Required if save_transcription is true (but mandatory in config regardless).
+# The file is overwritten on startup (not appended).
+transcript_save_path = "transcript.txt"

@@ -41,6 +41,8 @@ impl SubtitlesApp {
         debug_window_enabled: bool,
         show_interim: bool,
         stability_timeout_ms: u64,
+        save_transcription: bool,
+        transcript_save_path: &str,
         mode: Box<dyn SonioxMode + Send + Sync>,
     ) -> Self {
         // ... (preserving logic)
@@ -51,6 +53,7 @@ impl SubtitlesApp {
 
         let mut subtitles_state = TranscriptionState::new(50, max_chars);
         subtitles_state.set_stability_params(show_interim, stability_timeout_ms);
+        subtitles_state.set_logging(save_transcription, transcript_save_path);
 
         Self {
             rx_transcription,

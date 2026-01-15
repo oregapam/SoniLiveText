@@ -17,6 +17,9 @@ pub struct TranscriptionState {
     pub(crate) show_interim: bool,
     pub(crate) stability_timeout: Duration,
     pub(crate) last_interim_update: Instant,
+
+    // File Logging
+    pub(crate) transcript_writer: Option<std::io::BufWriter<std::fs::File>>,
 }
 
 impl TranscriptionState {
@@ -37,6 +40,7 @@ impl TranscriptionState {
             show_interim: true,
             stability_timeout: Duration::from_millis(0),
             last_interim_update: Instant::now(),
+            transcript_writer: None,
         }
     }
 
@@ -170,6 +174,49 @@ impl TranscriptionState {
 
 
 
+    pub fn log_final_text(&mut self, text: &str) {
+        if let Some(writer) = &mut self.transcript_writer {
+             use std::io::Write;
+             
+             // 1. Handle in-block sentence endings (e.g. "Sentence one. Sentence two.")
+             // We replace ". " with ".\n\n" to ensure paragraph breaks.
+             let mut content = text.replace(". ", ".\n\n")
+                                   .replace("! ", "!\n\n")
+                                   .replace("? ", "?\n\n");
+
+             // 2. Handle the very end of the block (e.g. "Sentence three.")
+             // If it ends with punctuation and NOT a newline (from step 1), append break.
+             let trimmed = content.trim_end();
+             let ends_with_punct = trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?');
+             
+             if ends_with_punct {
+                // If step 1 already added newlines (because of trailing space), don't double up.
+                 // let already_has_newline = content.trim_end().len() != content.len() && content.contains('\n'); 
+                 // Simple check: does the original string end with whitespace that we replaced?
+                 // Actually, if 'text' was "End. ", replace made it "End.\n\n". 'content' ends with \n.
+                 // checking ends_with('\n') is safer.
+                 
+                 if !content.ends_with('\n') {
+                     let is_decimal = if trimmed.ends_with('.') {
+                         // Check digit before dot
+                         trimmed.trim_end_matches('.').chars().last().map(|c| c.is_ascii_digit()).unwrap_or(false)
+                     } else {
+                         false
+                     };
+                     
+                     if !is_decimal {
+                         content.push_str("\n\n");
+                     }
+                 }
+             }
+
+             if let Err(e) = write!(writer, "{}", content) {
+                 log::error!("Failed to write to transcript log: {}", e);
+             }
+             let _ = writer.flush();
+        }
+    }
+
     pub(crate) fn push_final(&mut self, speaker: Option<String>, mut text: String, instant: bool) -> usize {
         if text.is_empty() { return 0; }
         let mut added = 0;
@@ -268,6 +315,27 @@ impl TranscriptionState {
         // Immediate completion if it's identical or backwards (safety)
         if self.interim_line.displayed_text.len() > self.interim_line.text.len() {
              self.interim_line.displayed_text = self.interim_line.text.clone();
+        }
+    }
+    
+    // Logging Logic
+    pub(crate) fn set_logging(&mut self, enabled: bool, path: &str) {
+        if enabled {
+             let f = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(path);
+             match f {
+                 Ok(file) => {
+                     self.transcript_writer = Some(std::io::BufWriter::new(file));
+                 },
+                 Err(e) => {
+                     log::error!("Failed to open transcript log file '{}': {}", path, e);
+                 }
+             }
+        } else {
+            self.transcript_writer = None;
         }
     }
 }

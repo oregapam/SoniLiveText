@@ -114,6 +114,9 @@ impl SonioxMode for TranscribeMode {
         state.last_final_ms = max_ms;
 
         if has_final {
+            // Log the authoritative final text (decoupled from screen state/freezing)
+            state.log_final_text(&final_text_segment);
+
             if final_text_segment.starts_with(&state.frozen_interim_history) {
                  let text_to_push = final_text_segment[state.frozen_interim_history.len()..].to_string();
                  state.log_debug(format!("FINAL: Pushing suffix '{}'", text_to_push.trim()));

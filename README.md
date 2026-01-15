@@ -87,6 +87,8 @@ The application is entirely controlled via the `config.toml` file.
 | `level` | String | Logging level (e.g., `"debug"`, `"info"`). |
 | `enable_raw_logging` | Boolean | If `true`, raw JSON responses from Soniox API are logged to `raw_data.log`. |
 | `enable_audio_logging` | Boolean | If `true`, the captured audio stream is saved to `debug_audio.wav` (useful for troubleshooting silence/noise). |
+| `save_transcription` | Boolean | If `true`, live finalized text is saved to a local file. Overwrites on startup. |
+| `transcript_save_path` | String | Path for the transcript file (e.g., `"transcript.txt"`). Mandatory if `save_transcription` is true. |
 
 ## ❓ Troubleshooting
 
