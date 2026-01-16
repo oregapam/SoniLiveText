@@ -1,6 +1,7 @@
 use eframe::egui;
 use crate::types::settings::SettingsApp;
-use crate::types::languages::LanguageHint; // Needed for language selection
+use crate::types::languages::LanguageHint;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -45,6 +46,21 @@ pub fn run_launcher() -> Result<Option<SettingsApp>, eframe::Error> {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct GlobalSettings {
+    pub api_key: String,
+    pub model: String,
+}
+
+impl Default for GlobalSettings {
+    fn default() -> Self {
+        Self {
+            api_key: "".to_string(),
+            model: "low_latency".to_string(),
+        }
+    }
+}
+
 pub struct LauncherApp {
     tx_launch: std::sync::mpsc::Sender<SettingsApp>,
     projects: Vec<(String, PathBuf, SettingsApp)>, // Name, Path, Config
@@ -57,6 +73,10 @@ pub struct LauncherApp {
     
     // Messages
     status_message: Option<(String, std::time::Instant)>,
+
+    // Global Settings
+    global_settings: GlobalSettings,
+    show_global_settings: bool,
 }
 
 impl LauncherApp {
@@ -69,6 +89,8 @@ impl LauncherApp {
             current_name: "New Project".to_string(),
             dirty: false,
             status_message: None,
+            global_settings: Self::load_global_settings(),
+            show_global_settings: false,
         };
         app.ensure_projects_dir();
         app.refresh_projects();
@@ -146,24 +168,55 @@ impl LauncherApp {
              self.show_status("Serialization failed");
         }
     }
+
+    fn load_global_settings() -> GlobalSettings {
+        if let Ok(content) = fs::read_to_string("launcher_config.toml") {
+            if let Ok(settings) = toml::from_str(&content) {
+                return settings;
+            }
+        }
+        GlobalSettings::default()
+    }
+
+    fn save_global_settings(&mut self) {
+         if let Ok(toml_str) = toml::to_string_pretty(&self.global_settings) {
+             if let Err(e) = fs::write("launcher_config.toml", toml_str) {
+                 self.show_status(format!("Error saving global settings: {}", e));
+             } else {
+                 self.show_status("Global settings saved!");
+             }
+         }
+    }
     
     fn show_status(&mut self, msg: impl Into<String>) {
         self.status_message = Some((msg.into(), std::time::Instant::now()));
     }
     
     fn launch(&mut self, ctx: &egui::Context) {
-        // Validate
-        if let Err(e) = self.current_config.validate() {
-            self.show_status(format!("Config Invalid: {}", e));
+        // Merge Global Settings
+        let mut final_config = self.current_config.clone();
+        
+        // Oversee logic: Global settings override / fill in project settings
+        // Ideally project shouldn't explicitly have them if they are global, 
+        // but for now we overwrite.
+        if !self.global_settings.api_key.is_empty() {
+             final_config.api_key = Some(self.global_settings.api_key.clone());
+        }
+        if !self.global_settings.model.is_empty() {
+             final_config.model = Some(self.global_settings.model.clone());
+        }
+
+        // Validate Merged Config
+        if let Err(e) = final_config.validate() {
+            self.show_status(format!("Config Invalid (check Global Settings): {}", e));
             return;
         }
         
-        // Save before launch if dirty (optional, but good UX)
-        // For now, let's just create a temporary config or just require save?
-        // Let's autosave if it's an existing project, or just use current state.
-        // We just send the current state.
-        
-        let _ = self.tx_launch.send(self.current_config.clone());
+        // Save Global too just in case
+        self.save_global_settings();
+
+        // Send merged config
+        let _ = self.tx_launch.send(final_config);
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
 }
@@ -207,7 +260,49 @@ impl eframe::App for LauncherApp {
                      }
                  }
              });
+             
+             ui.separator();
+             if ui.button("⚙ Global Settings").clicked() {
+                 self.show_global_settings = true;
+             }
         });
+
+        // --- Global Settings Window ---
+        if self.show_global_settings {
+            ctx.show_viewport_immediate(
+                egui::ViewportId::from_hash_of("global_settings"),
+                egui::ViewportBuilder::default()
+                    .with_title("Global Settings")
+                    .with_inner_size([500.0, 300.0]),
+                |ctx, class| {
+                    assert!(class == egui::ViewportClass::Immediate, "This egui backend doesn't support multiple viewports");
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        ui.heading("Global Configuration");
+                        ui.label("These settings apply to ALL projects.");
+                        ui.separator();
+                        
+                        egui::Grid::new("global_grid").num_columns(2).spacing([20.0, 8.0]).striped(true).show(ui, |ui| {
+                            ui.label("API Key:");
+                            ui.add(egui::TextEdit::singleline(&mut self.global_settings.api_key).password(true));
+                            ui.end_row();
+                            
+                            ui.label("Model:");
+                            ui.text_edit_singleline(&mut self.global_settings.model);
+                            ui.end_row();
+                        });
+                        
+                        ui.add_space(20.0);
+                        if ui.button("Close & Save").clicked() {
+                            self.save_global_settings();
+                            self.show_global_settings = false;
+                        }
+                    });
+                    if ctx.input(|i| i.viewport().close_requested()) {
+                        self.show_global_settings = false;
+                    }
+                }
+            );
+        }
 
         // --- Main Editor ---
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -247,24 +342,12 @@ impl eframe::App for LauncherApp {
 fn ui_settings_editor(ui: &mut egui::Ui, cfg: &mut SettingsApp) {
     ui.heading("General");
     egui::Grid::new("gen_grid").num_columns(2).spacing([20.0, 8.0]).striped(true).show(ui, |ui| {
-        ui.label("API Key:");
-        let mut api_key = cfg.api_key.clone().unwrap_or_default();
-        if ui.add(egui::TextEdit::singleline(&mut api_key).password(true)).changed() {
-            cfg.api_key = Some(api_key);
-        }
-        ui.end_row();
-
+        // API Key and Model moved to Global Settings
+        
         ui.label("Context:");
         let mut context = cfg.context.clone().unwrap_or_default();
         if ui.add(egui::TextEdit::multiline(&mut context).desired_rows(2)).changed() {
              cfg.context = Some(context);
-        }
-        ui.end_row();
-        
-        ui.label("Model:");
-        let mut model = cfg.model.clone().unwrap_or_default();
-        if ui.text_edit_singleline(&mut model).changed() {
-            cfg.model = Some(model);
         }
         ui.end_row();
 
