@@ -332,7 +332,9 @@ impl eframe::App for LauncherApp {
              ui.separator();
              
              // Tabs or Sections? Let's implement scrollable sections.
-             egui::ScrollArea::vertical().show(ui, |ui| {
+             // auto_shrink([false, false]) ensures the scroll area takes full width/height, 
+             // pushing the vertical scrollbar to the right edge.
+             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                  ui_settings_editor(ui, &mut self.current_config);
              });
              
