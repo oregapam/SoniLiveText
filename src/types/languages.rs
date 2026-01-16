@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
 pub enum LanguageHint {
     #[serde(rename = "af")]
     Afrikaans,

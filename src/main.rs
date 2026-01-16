@@ -6,7 +6,6 @@ use eframe::icon_data::from_png_bytes;
 use sonilivetext::errors::SonioxWindowsErrors;
 use sonilivetext::gui::utils::get_inner_size;
 use sonilivetext::initialize_app;
-use sonilivetext::types::settings::SettingsApp;
 use sonilivetext::windows::utils::{get_screen_size, show_error};
 use std::sync::Arc;
 
@@ -14,9 +13,25 @@ const FONT_BYTES: &[u8] = include_bytes!("../assets/MPLUSRounded1c-Medium.ttf");
 const ICON_BYTES: &[u8] = include_bytes!("../assets/icon.png");
 
 async fn run() -> Result<(), SonioxWindowsErrors> {
-    let settings = SettingsApp::new("config.toml")?;
+    // 1. Run Launcher (Phase 1)
+    // We run the launcher in the main thread (blocking).
+    // Note: eframe::run_native handles its own event loop.
+    let launcher_result = sonilivetext::gui::launcher::run_launcher();
+    
+    let settings = match launcher_result {
+        Ok(Some(s)) => s,
+        Ok(None) => return Ok(()), // User closed without launching
+        Err(e) => {
+            log::error!("Launcher failed: {}", e);
+            return Err(SonioxWindowsErrors::Internal(format!("Launcher error: {}", e)));
+        }
+    };
+
+    // 2. Validate & Run Overlay (Phase 2)
+    // The settings are now provided by the launcher, not loaded from config.toml directly.
     let (width, height) = get_screen_size();
     
+    // We already have the settings struct, but let's re-validate just to be safe/consistent
     if let Err(msg) = settings.validate() {
         show_error(&msg);
         log::error!("{}", msg);

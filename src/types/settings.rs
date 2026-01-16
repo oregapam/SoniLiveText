@@ -2,20 +2,20 @@ use crate::errors::SonioxWindowsErrors;
 use crate::types::languages::LanguageHint;
 use config::{Config, ConfigError, File};
 use log::LevelFilter;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct SettingsApp {
     pub(crate) language_hints: Option<Vec<LanguageHint>>,
     pub(crate) context: Option<String>,
     pub(crate) api_key: Option<String>,
     pub(crate) target_language: Option<LanguageHint>,
     pub(crate) enable_translate: Option<bool>,
-    enable_high_priority: Option<bool>,
-    enable_speakers: Option<bool>,
-    model: Option<String>,
-    level: Option<String>,
+    pub(crate) enable_high_priority: Option<bool>,
+    pub(crate) enable_speakers: Option<bool>,
+    pub(crate) model: Option<String>,
+    pub(crate) level: Option<String>,
     pub(crate) font_size: Option<f32>,
     pub(crate) text_color: Option<(u8, u8, u8)>,
     pub(crate) window_width: Option<f32>,
