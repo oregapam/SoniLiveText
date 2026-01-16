@@ -233,38 +233,46 @@ impl eframe::App for LauncherApp {
 
         // --- Sidebar ---
         egui::SidePanel::left("project_list").min_width(200.0).show(ctx, |ui| {
-             ui.add_space(10.0);
-             ui.heading("Projects");
-             ui.separator();
-             
-             if ui.button("➕ New Project").clicked() {
-                 self.selected_index = None;
-                 self.current_name = "New Project".to_string();
-                 self.current_config = load_default_template();
-                 self.dirty = false;
-             }
-             
-             ui.separator();
-             
-             egui::ScrollArea::vertical().show(ui, |ui| {
-                 let mut selected = self.selected_index;
-                 for (i, (name, _, _)) in self.projects.iter().enumerate() {
-                     if ui.selectable_label(selected == Some(i), name).clicked() {
-                         selected = Some(i);
-                     }
+             // Bottom-up layout allows fixing elements to the bottom
+             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                 // 1. Bottom Elements (Rendered first, appear at bottom)
+                 ui.add_space(10.0);
+                 if ui.button("⚙ Global Settings").clicked() {
+                     self.show_global_settings = true;
                  }
-                 
-                 if selected != self.selected_index {
-                     if let Some(idx) = selected {
-                         self.select_project(idx);
+                 ui.separator();
+
+                 // 2. Top Elements (Fill the rest of the space, rendered top-to-bottom)
+                 ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                     ui.add_space(10.0);
+                     ui.heading("Projects");
+                     ui.separator();
+                     
+                     if ui.button("➕ New Project").clicked() {
+                         self.selected_index = None;
+                         self.current_name = "New Project".to_string();
+                         self.current_config = load_default_template();
+                         self.dirty = false;
                      }
-                 }
+                     
+                     ui.separator();
+                     
+                     egui::ScrollArea::vertical().show(ui, |ui| {
+                         let mut selected = self.selected_index;
+                         for (i, (name, _, _)) in self.projects.iter().enumerate() {
+                             if ui.selectable_label(selected == Some(i), name).clicked() {
+                                 selected = Some(i);
+                             }
+                         }
+                         
+                         if selected != self.selected_index {
+                             if let Some(idx) = selected {
+                                 self.select_project(idx);
+                             }
+                         }
+                     });
+                 });
              });
-             
-             ui.separator();
-             if ui.button("⚙ Global Settings").clicked() {
-                 self.show_global_settings = true;
-             }
         });
 
         // --- Global Settings Window ---
