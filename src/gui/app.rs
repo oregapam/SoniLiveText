@@ -147,9 +147,14 @@ impl App for SubtitlesApp {
                 if self.enable_high_priority {
                     initialize_tool_window(frame);
                 }
-                if let Ok(transcription) = self.rx_transcription.try_recv() {
+                // Drain all pending messages to prevent backlog
+                let mut received_data = false;
+                while let Ok(transcription) = self.rx_transcription.try_recv() {
                     self.mode.handle_incoming(&mut self.subtitles_state, transcription);
-                    // Data changed, need repaint
+                    received_data = true;
+                }
+                
+                if received_data {
                     ctx.request_repaint();
                 }
                 
