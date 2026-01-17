@@ -234,43 +234,45 @@ impl eframe::App for LauncherApp {
 
         // --- Sidebar ---
         egui::SidePanel::left("project_list").min_width(200.0).max_width(400.0).show(ctx, |ui| {
-             // Bottom-up layout allows fixing elements to the bottom
-             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                 // 1. Bottom Elements (Rendered first, appear at bottom)
-                 ui.add_space(10.0);
-                 if ui.button("⚙ Global Settings").clicked() {
-                     self.show_global_settings = true;
-                 }
-                 ui.separator();
-
-                 // 2. Top Elements (Fill the rest of the space, rendered top-to-bottom)
-                 ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+             ui.add_enabled_ui(!self.show_global_settings, |ui| {
+                 // Bottom-up layout allows fixing elements to the bottom
+                 ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                     // 1. Bottom Elements (Rendered first, appear at bottom)
                      ui.add_space(10.0);
-                     ui.heading("Projects");
-                     ui.separator();
-                     
-                     if ui.button("➕ New Project").clicked() {
-                         self.selected_index = None;
-                         self.current_name = "New Project".to_string();
-                         self.current_config = load_default_template();
-                         self.dirty = false;
+                     if ui.button("⚙ Global Settings").clicked() {
+                         self.show_global_settings = true;
                      }
-                     
                      ui.separator();
-                     
-                     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                         let mut selected = self.selected_index;
-                         for (i, (name, _, _)) in self.projects.iter().enumerate() {
-                             if ui.selectable_label(selected == Some(i), name).clicked() {
-                                 selected = Some(i);
-                             }
+    
+                     // 2. Top Elements (Fill the rest of the space, rendered top-to-bottom)
+                     ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                         ui.add_space(10.0);
+                         ui.heading("Projects");
+                         ui.separator();
+                         
+                         if ui.button("➕ New Project").clicked() {
+                             self.selected_index = None;
+                             self.current_name = "New Project".to_string();
+                             self.current_config = load_default_template();
+                             self.dirty = false;
                          }
                          
-                         if selected != self.selected_index {
-                             if let Some(idx) = selected {
-                                 self.select_project(idx);
+                         ui.separator();
+                         
+                         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                             let mut selected = self.selected_index;
+                             for (i, (name, _, _)) in self.projects.iter().enumerate() {
+                                 if ui.selectable_label(selected == Some(i), name).clicked() {
+                                     selected = Some(i);
+                                 }
                              }
-                         }
+                             
+                             if selected != self.selected_index {
+                                 if let Some(idx) = selected {
+                                     self.select_project(idx);
+                                 }
+                             }
+                         });
                      });
                  });
              });
@@ -278,74 +280,91 @@ impl eframe::App for LauncherApp {
 
         // --- Global Settings Window ---
         if self.show_global_settings {
-            ctx.show_viewport_immediate(
-                egui::ViewportId::from_hash_of("global_settings"),
-                egui::ViewportBuilder::default()
-                    .with_title("Global Settings")
-                    .with_inner_size([500.0, 300.0]),
-                |ctx, class| {
-                    assert!(class == egui::ViewportClass::Immediate, "This egui backend doesn't support multiple viewports");
-                    egui::CentralPanel::default().show(ctx, |ui| {
-                        ui.heading("Global Configuration");
-                        ui.label("These settings apply to ALL projects.");
-                        ui.separator();
-                        
-                        egui::Grid::new("global_grid").num_columns(2).spacing([20.0, 8.0]).striped(true).show(ui, |ui| {
-                            ui.label("API Key:");
-                            ui.add(egui::TextEdit::singleline(&mut self.global_settings.api_key).password(true));
-                            ui.end_row();
-                            
-                            ui.label("Model:");
-                            ui.text_edit_singleline(&mut self.global_settings.model);
-                            ui.end_row();
-                        });
-                        
-                        ui.add_space(20.0);
-                        if ui.button("Close & Save").clicked() {
-                            self.save_global_settings();
-                            self.show_global_settings = false;
-                        }
-                    });
-                    if ctx.input(|i| i.viewport().close_requested()) {
-                        self.show_global_settings = false;
-                    }
-                }
+            // 1. Dimmed Backdrop (Layer: Middle)
+            // Sits above panels (Background) but below the modal (Foreground).
+            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::new("modal_backdrop")));
+            painter.rect_filled(
+                ctx.viewport_rect(), 
+                0.0, 
+                egui::Color32::from_black_alpha(200)
             );
+
+            let mut open = true;
+            let mut should_close = false;
+            
+            // 2. The Modal Window (Layer: Foreground)
+            egui::Window::new("Global Settings")
+                .order(egui::Order::Foreground)
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    ui.heading("Global Configuration");
+                    ui.label("These settings apply to ALL projects.");
+                    ui.separator();
+                    
+                    egui::Grid::new("global_grid").num_columns(2).spacing([20.0, 8.0]).striped(true).show(ui, |ui| {
+                        ui.label("API Key:");
+                        ui.add(egui::TextEdit::singleline(&mut self.global_settings.api_key).password(true));
+                        ui.end_row();
+                        
+                        ui.label("Model:");
+                        ui.text_edit_singleline(&mut self.global_settings.model);
+                        ui.end_row();
+                    });
+                    
+                    ui.add_space(20.0);
+                    if ui.button("Close & Save").clicked() {
+                        should_close = true;
+                    }
+                });
+            
+            if should_close {
+                self.save_global_settings();
+                self.show_global_settings = false;
+            } else if !open {
+                // User clicked 'X'
+                self.show_global_settings = false;
+            }
         }
 
         // --- Main Editor ---
         egui::CentralPanel::default().show(ctx, |ui| {
-             ui.horizontal(|ui| {
-                 ui.label("Project Name:");
-                 if ui.add(egui::TextEdit::singleline(&mut self.current_name)).changed() {
-                     self.dirty = true;
-                 }
+             // Disable interaction with the main UI if the modal is open
+             ui.add_enabled_ui(!self.show_global_settings, |ui| {
+                 ui.horizontal(|ui| {
+                     ui.label("Project Name:");
+                     if ui.add(egui::TextEdit::singleline(&mut self.current_name)).changed() {
+                         self.dirty = true;
+                     }
+                     
+                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                         if ui.button("🚀 LAUNCH").clicked() {
+                             self.launch(ctx);
+                         }
+                         if ui.button("💾 Save").clicked() {
+                             self.save_current();
+                         }
+                     });
+                 });
+                 ui.separator();
                  
-                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                     if ui.button("🚀 LAUNCH").clicked() {
-                         self.launch(ctx);
-                     }
-                     if ui.button("💾 Save").clicked() {
-                         self.save_current();
-                     }
+                 // Tabs or Sections? Let's implement scrollable sections.
+                 // auto_shrink([false, false]) ensures the scroll area takes full width/height, 
+                 // pushing the vertical scrollbar to the right edge.
+                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                     ui_settings_editor(ui, &mut self.current_config);
                  });
+                 
+                 // Status Bottom
+                 if let Some((msg, _)) = &self.status_message {
+                     ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                         ui.label(egui::RichText::new(msg).color(egui::Color32::YELLOW));
+                         ui.separator();
+                     });
+                 }
              });
-             ui.separator();
-             
-             // Tabs or Sections? Let's implement scrollable sections.
-             // auto_shrink([false, false]) ensures the scroll area takes full width/height, 
-             // pushing the vertical scrollbar to the right edge.
-             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                 ui_settings_editor(ui, &mut self.current_config);
-             });
-             
-             // Status Bottom
-             if let Some((msg, _)) = &self.status_message {
-                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-                     ui.label(egui::RichText::new(msg).color(egui::Color32::YELLOW));
-                     ui.separator();
-                 });
-             }
         });
     }
 }
