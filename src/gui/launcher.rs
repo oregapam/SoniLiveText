@@ -232,7 +232,7 @@ impl eframe::App for LauncherApp {
         }
 
         // --- Sidebar ---
-        egui::SidePanel::left("project_list").min_width(200.0).show(ctx, |ui| {
+        egui::SidePanel::left("project_list").min_width(200.0).max_width(400.0).show(ctx, |ui| {
              // Bottom-up layout allows fixing elements to the bottom
              ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                  // 1. Bottom Elements (Rendered first, appear at bottom)
