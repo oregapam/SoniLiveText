@@ -11,6 +11,7 @@ pub fn run_launcher() -> Result<Option<SettingsApp>, eframe::Error> {
             .with_decorations(true)
             .with_transparent(false)
             .with_inner_size([900.0, 650.0])
+            .with_min_inner_size([900.0, 600.0])
             .with_title("SoniLiveText Launcher"),
         ..Default::default()
     };
