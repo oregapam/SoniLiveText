@@ -258,7 +258,7 @@ impl eframe::App for LauncherApp {
                      
                      ui.separator();
                      
-                     egui::ScrollArea::vertical().show(ui, |ui| {
+                     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                          let mut selected = self.selected_index;
                          for (i, (name, _, _)) in self.projects.iter().enumerate() {
                              if ui.selectable_label(selected == Some(i), name).clicked() {
